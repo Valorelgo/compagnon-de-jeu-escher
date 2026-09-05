@@ -598,7 +598,7 @@ function renderGameView(container) {
                         <strong style="font-size:16px; cursor:pointer; text-decoration:${isOOA ? 'line-through' : 'underline'}; color:${nameColor};" onclick="openFighterDetailModal(${idx})">
                             ${m.customName}
                         </strong> 
-                        <small style="color:${isOOA ? '#666' : 'inherit'};">(${(m.type || []).join(', ')})</small><br>
+                        <small style="color:${isOOA ? '#666' : 'inherit'};"> — <strong>${m.charName || ''}</strong> (${(m.type || []).join(', ')})</small><br>
                         <small style="color:${isOOA ? '#666' : 'inherit'};">Armes : ${(m.weapons || []).map(w => w.name + (w.accessory ? ' ['+w.accessory.name+']' : '')).join(', ') || 'Aucune'}</small>
                         ${activeConds.length > 0 ? `<br><small style="color:${isOOA ? '#666' : '#e67e22'};"><strong>Conditions :</strong> ${activeConds.map(c => `<span style="cursor:pointer; text-decoration:underline;" onclick="showConditionDetails('${c.replace(/'/g, "\\'")}')">${c}</span>`).join(', ')}</small>` : ''}
                     </div>
@@ -1804,12 +1804,16 @@ function renderTradingPostView() {
         let credCost = w.cost_credits || w.cost || w.price || 0;
         let canAfford = (currentGang.credits || 0) >= credCost && tradingPostSession.availableTP >= tpCost;
         let cleanName = w.name.replace(/'/g, "\\'");
+        
+        let prof = (w.profiles && w.profiles[0]) ? w.profiles[0] : null;
+        let statsText = prof ? `Portée: ${prof.SR}/${prof.LR} | F:${prof.S} | AP:${prof.AP} | D:${prof.L}${prof.traits ? ` | ${prof.traits}` : ''}` : '';
 
         html += `
             <div style="background:#1a1a1a; border:1px solid #333; padding:8px; border-radius:5px; display:flex; justify-content:space-between; align-items:center; ${!canAfford ? 'opacity:0.5;' : ''}">
                 <div>
                     <strong style="color:#fff;">${w.name}</strong><br>
                     <small style="color:#aaa;">Coût : ${credCost} cr | Rareté : <span style="color:var(--accent-cyan); font-weight:bold;">${tpCost} TP</span></small>
+                    ${statsText ? `<br><small style="color:#888; font-size:11px;">${statsText}</small>` : ''}
                 </div>
                 <button class="${canAfford ? 'btn btn-cyan' : 'btn'}" ${!canAfford ? 'disabled' : ''} style="padding:4px 10px; font-size:12px;" onclick="buyTradingPostItem('Arme', '${cleanName}', ${credCost}, ${tpCost})">Acheter</button>
             </div>
@@ -1835,6 +1839,7 @@ function renderTradingPostView() {
                 <div>
                     <strong style="color:#fff;">${e.name}</strong> <small style="color:#888;">(${rawType})</small><br>
                     <small style="color:#aaa;">Coût : ${credCost} cr | Rareté : <span style="color:var(--accent-cyan); font-weight:bold;">${tpCost} TP</span></small>
+                    ${e.effect ? `<br><small style="color:#888; font-size:11px;">${e.effect}</small>` : ''}
                 </div>
                 <button class="${canAfford ? 'btn btn-cyan' : 'btn'}" ${!canAfford ? 'disabled' : ''} style="padding:4px 10px; font-size:12px;" onclick="buyTradingPostItem('${cleanType}', '${cleanName}', ${credCost}, ${tpCost})">Acheter</button>
             </div>
