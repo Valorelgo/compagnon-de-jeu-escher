@@ -618,7 +618,7 @@ function updateTopBar() {
     }, 0);
 
     // 3. Richesse totale = Gang Rating + Stash
-    let gangWealth = gangRating + stashVal;
+    let gangWealth = gangRating + stashVal + (currentGang.credits || 0);
 
     // 4. Réputation (base + bonus territoires)
     let totalRep = typeof calculateGangReputation === 'function' 
