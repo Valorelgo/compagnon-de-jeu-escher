@@ -144,6 +144,8 @@ function saveFighter() {
 
     tempFighter.totalCost = calculateFighterCost(tempFighter);
 
+    let creditsToPay = 0;
+
     if (!currentGang.isEstablished) {
         let oldCost = 0;
         if (appState.editTarget !== null) {
@@ -152,9 +154,8 @@ function saveFighter() {
         let diff = tempFighter.totalCost - oldCost;
         if (currentGang.credits - diff < 0) return showToast("Crédits insuffisants !", "error");
         currentGang.credits -= diff;
+        creditsToPay = diff;
     } else {
-        let creditsToPay = 0;
-
         if (appState.editTarget === null) {
             const charDef = db.characters.find(c => c.id === tempFighter.charId);
             creditsToPay += (charDef ? charDef.cost : 0);
@@ -280,14 +281,23 @@ function removeFighter(idx) {
     if (!m) return;
 
     const gearVanishes = shouldFighterGearVanish(m);
+    const isCreationPhase = !currentGang.isEstablished;
+
+    let refundLine = isCreationPhase
+        ? `<small style="color:#2ecc71; font-size:12px;">Gang en cours de création : son coût (${m.totalCost || 0} cr) sera intégralement remboursé.</small>`
+        : `<small style="color:#e74c3c; font-size:12px;">Son coût (${m.totalCost || 0} cr) n'est pas remboursé : il/elle quitte simplement le gang.</small>`;
+
+    let gearLine = isCreationPhase
+        ? `<small style="color:#aaa; font-size:13px;">Son équipement disparaît avec lui/elle (déjà inclus dans le remboursement).</small><br>`
+        : `<small style="color:#aaa; font-size:13px;">${gearVanishes
+            ? `Mercenaire, familier, bête ou brute : son équipement et ses armes disparaissent avec lui/elle.`
+            : `Ses armes et équipements rejoindront automatiquement la réserve du gang (Stash).`}</small><br>`;
 
     showConfirmModal(
         "Licencier le combattant",
         `Voulez-vous vraiment licencier <strong>${m.customName}</strong> (${m.charName}) ?<br><br>
-        <small style="color:#aaa; font-size:13px;">${gearVanishes
-            ? `Mercenaire, familier, bête ou brute : son équipement et ses armes disparaissent avec lui/elle.`
-            : `Ses armes et équipements rejoindront automatiquement la réserve du gang (Stash).`}</small><br>
-        <small style="color:#e74c3c; font-size:12px;">Son coût (${m.totalCost||0} cr) n'est pas remboursé : il/elle quitte simplement le gang.</small>`,
+        ${gearLine}
+        ${refundLine}`,
         "Licencier",
         () => {
             performRemoveFighter(idx);
@@ -299,13 +309,26 @@ function performRemoveFighter(idx) {
     const m = currentGang.members[idx];
     if (!m) return;
 
-    transferFighterGearToStash(m);
+    const isCreationPhase = !currentGang.isEstablished;
+
+    if (isCreationPhase) {
+        // Pendant la création du gang, licencier un combattant annule purement
+        // et simplement sa recrue : son coût total (base + armes/équipement,
+        // déjà déduit lors de saveFighter) est intégralement remboursé, et son
+        // équipement ne rejoint PAS la réserve (sinon il serait à la fois
+        // remboursé en crédits ET récupérable gratuitement en stash).
+        currentGang.credits += (m.totalCost || 0);
+    } else {
+        transferFighterGearToStash(m);
+    }
 
     currentGang.members.splice(idx, 1);
     calculateGangRating(currentGang);
     saveGangs();
     renderGangManage(document.getElementById('main-content'));
-    showToast(`${m.customName} a été licencié(e). ${shouldFighterGearVanish(m) ? "Son équipement a disparu avec lui/elle." : "Ses armes et équipements ont rejoint la réserve du gang."}`);
+    showToast(isCreationPhase
+        ? `${m.customName} a été licencié(e). ${m.totalCost || 0} cr remboursé(s).`
+        : `${m.customName} a été licencié(e). ${shouldFighterGearVanish(m) ? "Son équipement a disparu avec lui/elle." : "Ses armes et équipements ont rejoint la réserve du gang."}`);
     if (typeof ensureGangHasLeader === 'function') ensureGangHasLeader();
 }
 
