@@ -765,6 +765,12 @@ function calculateFighterCost(m) {
     
     (m.equipment || []).forEach(e => {
         if (!e) return;
+        // Une référence de familier (achetée via buyFamiliarForFighter /
+        // adoptFamiliarFromStash) ne doit jamais être comptée dans le coût du
+        // propriétaire : le coût du familier est déjà suivi sur sa propre
+        // fiche (totalCost du membre familier) et déduit séparément au moment
+        // de l'achat. Sans cette exclusion, son coût serait compté deux fois.
+        if (e.familiarMemberId) return;
         const isDefault = e.isDefault || (char.default_equipment && (char.default_equipment.includes(e.id) || char.default_equipment.includes(e.name)));
         if (!isDefault) {
             total += (e.cost_credits || e.cost || 0);
