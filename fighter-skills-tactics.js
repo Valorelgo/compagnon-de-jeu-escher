@@ -282,16 +282,19 @@ function removeFighter(idx) {
 
     const gearVanishes = shouldFighterGearVanish(m);
     const isCreationPhase = !currentGang.isEstablished;
+    const linkedFamiliars = (typeof getFamiliarsOfFighter === 'function') ? getFamiliarsOfFighter(m.id) : [];
+    const familiarsRefund = linkedFamiliars.reduce((sum, f) => sum + (f.totalCost || 0), 0);
+    const totalRefund = (m.totalCost || 0) + familiarsRefund;
 
     let refundLine = isCreationPhase
-        ? `<small style="color:#2ecc71; font-size:12px;">Gang en cours de création : son coût (${m.totalCost || 0} cr) sera intégralement remboursé.</small>`
+        ? `<small style="color:#2ecc71; font-size:12px;">Gang en cours de création : son coût${linkedFamiliars.length ? ' (et celui de son/ses familier(s) rattaché(s))' : ''} sera intégralement remboursé, soit ${totalRefund} cr.</small>`
         : `<small style="color:#e74c3c; font-size:12px;">Son coût (${m.totalCost || 0} cr) n'est pas remboursé : il/elle quitte simplement le gang.</small>`;
 
     let gearLine = isCreationPhase
-        ? `<small style="color:#aaa; font-size:13px;">Son équipement disparaît avec lui/elle (déjà inclus dans le remboursement).</small><br>`
+        ? `<small style="color:#aaa; font-size:13px;">Son équipement${linkedFamiliars.length ? ' et son/ses familier(s)' : ''} disparaissent avec lui/elle (déjà inclus dans le remboursement).</small><br>`
         : `<small style="color:#aaa; font-size:13px;">${gearVanishes
             ? `Mercenaire, familier, bête ou brute : son équipement et ses armes disparaissent avec lui/elle.`
-            : `Ses armes et équipements rejoindront automatiquement la réserve du gang (Stash).`}</small><br>`;
+            : `Ses armes et équipements rejoindront automatiquement la réserve du gang (Stash)${linkedFamiliars.length ? ', son/ses familier(s) rattaché(s) y seront également récupérables' : ''}.`}</small><br>`;
 
     showConfirmModal(
         "Licencier le combattant",
@@ -310,24 +313,36 @@ function performRemoveFighter(idx) {
     if (!m) return;
 
     const isCreationPhase = !currentGang.isEstablished;
+    const linkedFamiliars = (typeof getFamiliarsOfFighter === 'function') ? getFamiliarsOfFighter(m.id) : [];
+    let familiarsRefund = 0;
 
     if (isCreationPhase) {
         // Pendant la création du gang, licencier un combattant annule purement
         // et simplement sa recrue : son coût total (base + armes/équipement,
         // déjà déduit lors de saveFighter) est intégralement remboursé, et son
         // équipement ne rejoint PAS la réserve (sinon il serait à la fois
-        // remboursé en crédits ET récupérable gratuitement en stash).
+        // remboursé en crédits ET récupérable gratuitement en stash). Ses
+        // familiers rattachés (Phyrr cat, Phelynx...) suivent la même logique :
+        // remboursés et retirés du roster, sans passer par le stash.
         currentGang.credits += (m.totalCost || 0);
+        linkedFamiliars.forEach(f => {
+            familiarsRefund += (f.totalCost || 0);
+        });
+        currentGang.credits += familiarsRefund;
+        // Retrait du propriétaire ET de ses familiers en un seul passage, par
+        // id plutôt que par index (l'index d'origine `idx` n'est plus fiable
+        // une fois des familiers filtrés ailleurs dans le tableau).
+        currentGang.members = currentGang.members.filter(fm => fm.id !== m.id && !linkedFamiliars.some(f => f.id === fm.id));
     } else {
         transferFighterGearToStash(m);
+        currentGang.members = currentGang.members.filter(fm => fm.id !== m.id);
     }
 
-    currentGang.members.splice(idx, 1);
     calculateGangRating(currentGang);
     saveGangs();
     renderGangManage(document.getElementById('main-content'));
     showToast(isCreationPhase
-        ? `${m.customName} a été licencié(e). ${m.totalCost || 0} cr remboursé(s).`
+        ? `${m.customName} a été licencié(e). ${(m.totalCost || 0) + familiarsRefund} cr remboursé(s)${linkedFamiliars.length ? ' (familier(s) inclus)' : ''}.`
         : `${m.customName} a été licencié(e). ${shouldFighterGearVanish(m) ? "Son équipement a disparu avec lui/elle." : "Ses armes et équipements ont rejoint la réserve du gang."}`);
     if (typeof ensureGangHasLeader === 'function') ensureGangHasLeader();
 }
