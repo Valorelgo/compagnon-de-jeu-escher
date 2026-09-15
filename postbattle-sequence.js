@@ -270,14 +270,17 @@ function transferFighterGearToStash(m) {
     }
     if (m.equipment && Array.isArray(m.equipment)) {
         m.equipment.forEach(e => {
-            currentGang.stash.push({ name: e.name, type: e.type || "Équipement", cost: e.cost_credits || e.cost || 0 });
+            let stashEntry = { name: e.name, type: e.type || "Équipement", cost: e.cost_credits || e.cost || 0 };
             // Le familier lié à cette référence d'équipement quitte le roster actif
-            // avec son propriétaire, mais reste récupérable via l'objet ci-dessus,
+            // avec son propriétaire, mais reste récupérable via l'objet ci-dessous,
             // rangé dans le stash : n'importe quel autre guerrier pourra le
-            // reprendre depuis la même catégorie d'équipement "Familiers".
+            // reprendre depuis la même catégorie d'équipement "Familiers"
+            // (adoptFamiliarFromStash() a besoin de familiarCharId pour le retrouver).
             if (e.familiarMemberId) {
+                stashEntry.familiarCharId = e.familiarCharId;
                 currentGang.members = currentGang.members.filter(fm => fm.id !== e.familiarMemberId);
             }
+            currentGang.stash.push(stashEntry);
         });
     }
 }
