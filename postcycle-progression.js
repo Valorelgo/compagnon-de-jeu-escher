@@ -54,6 +54,11 @@ function openStashModal() {
         }
         inventoryMap[name].stash++;
         if (cost > 0 && !inventoryMap[name].cost) inventoryMap[name].cost = cost;
+        // Un familier a besoin de son charId pour pouvoir recréer sa fiche
+        // complète lors de la reprise (voir quickAdoptFamiliarFromStash).
+        if (type === 'Familier' && typeof item === 'object' && item.familiarCharId) {
+            inventoryMap[name].familiarCharId = item.familiarCharId;
+        }
     });
 
     let html = `
@@ -89,7 +94,9 @@ function openStashModal() {
             let sellPrice = calculateResellPrice(data.cost);
             let cleanName = escapeForJsStr(itemName);
             let isAccessory = (data.type || '').toLowerCase().includes('accessoire');
-            let canQuickEquip = stashCount > 0 && !isAccessory;
+            let isFamiliarRow = data.type === 'Familier';
+            let canQuickEquip = stashCount > 0 && !isAccessory && !isFamiliarRow;
+            let canQuickAdoptFamiliar = stashCount > 0 && isFamiliarRow;
 
             html += `
                 <tr style="border-bottom:1px solid #222;">
@@ -101,15 +108,17 @@ function openStashModal() {
                     </td>
                     <td style="padding:6px; text-align:right;">
                         <div style="display:flex; gap:6px; justify-content:flex-end; align-items:center; flex-wrap:wrap;">
-                        ${canQuickEquip ? (eligibleFighters.length > 0 ? `
+                        ${(canQuickEquip || canQuickAdoptFamiliar) ? (eligibleFighters.length > 0 ? `
                             <select id="quickequip-target-${rowIdx}" style="padding:2px 4px; font-size:11px; background:#1a1a1a; color:#fff; border:1px solid #444; border-radius:3px;">
                                 ${eligibleFighters.map(f => `<option value="${f.id}">${f.customName}</option>`).join('')}
                             </select>
-                            <button class="btn-cyan" style="padding:2px 8px; font-size:11px;" onclick="quickEquipStashItem('${cleanName}', document.getElementById('quickequip-target-${rowIdx}').value)">Équiper</button>
+                            ${canQuickAdoptFamiliar
+                                ? `<button class="btn-cyan" style="padding:2px 8px; font-size:11px;" onclick="quickAdoptFamiliarFromStash('${cleanName}', '${data.familiarCharId || ''}', document.getElementById('quickequip-target-${rowIdx}').value)">Reprendre (Familier)</button>`
+                                : `<button class="btn-cyan" style="padding:2px 8px; font-size:11px;" onclick="quickEquipStashItem('${cleanName}', document.getElementById('quickequip-target-${rowIdx}').value)">Équiper</button>`}
                         ` : `<small style="color:#888;">Aucun combattant éligible</small>`) : ''}
                         ${stashCount > 0
                             ? `<button class="btn btn-cyan" style="padding:2px 8px; font-size:11px;" onclick="sellStashItem('${cleanName}', ${sellPrice})">💰 Vendre (${sellPrice} cr)</button>`
-                            : (!canQuickEquip ? `<span style="color:#555; font-size:11px;">—</span>` : '')}
+                            : (!canQuickEquip && !canQuickAdoptFamiliar ? `<span style="color:#555; font-size:11px;">—</span>` : '')}
                         </div>
                     </td>
                 </tr>
@@ -192,6 +201,45 @@ function quickEquipStashItem(itemName, fighterId) {
 
     saveGangs();
     showToast(`"${itemName}" équipé sur ${m.customName} (gratuit, depuis la réserve).`, "success");
+    openStashModal();
+}
+
+// Reprise rapide d'un familier depuis la vue d'ensemble de la Réserve du Gang.
+// Contrairement à un objet ordinaire (arme/équipement), un familier doit
+// redevenir un membre à part entière du gang avec sa propre fiche (mêmes
+// mécanismes que adoptFamiliarFromStash côté fiche de combattant), pas une
+// simple ligne d'équipement générique sur le combattant qui le récupère.
+function quickAdoptFamiliarFromStash(itemName, familiarCharId, fighterId) {
+    if (!currentGang || !currentGang.stash) return;
+    let owner = currentGang.members.find(x => x.id === fighterId);
+    if (!owner) return showToast("Combattant introuvable.", "error");
+    if (isMercOrBeastProfile(owner)) return showToast("Ce combattant ne peut pas recevoir de familier.", "error");
+
+    const charDef = (typeof db !== 'undefined' && db.characters) ? db.characters.find(c => c.id === familiarCharId) : null;
+    if (!charDef) return showToast("Définition du familier introuvable.", "error");
+
+    let sIdx = currentGang.stash.findIndex(item => (typeof item === 'string' ? item : item.name) === itemName && (typeof item === 'object' ? item.familiarCharId === familiarCharId : true));
+    if (sIdx < 0) return showToast("Ce familier n'est plus disponible dans la réserve.", "error");
+    currentGang.stash.splice(sIdx, 1);
+
+    let familiarMember = createFamiliarMemberObject(charDef, owner.id);
+    currentGang.members.push(familiarMember);
+
+    if (!owner.equipment) owner.equipment = [];
+    owner.equipment.push({
+        id: 'famref_' + familiarMember.id,
+        name: charDef.name,
+        type: 'Familier',
+        cost_credits: charDef.cost || 0,
+        familiarMemberId: familiarMember.id,
+        familiarCharId: charDef.id,
+        costPrepaid: true,
+        fromStash: true
+    });
+
+    calculateGangRating(currentGang);
+    saveGangs();
+    showToast(`${charDef.name} (repris de la réserve) est rattaché à ${owner.customName || owner.charName} !`, "success");
     openStashModal();
 }
 

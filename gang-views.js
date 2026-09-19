@@ -331,6 +331,40 @@ function ensureInnateFighterSkills(gang) {
             }
         }
 
+        // Armes intégrées données automatiquement par une compétence (voir
+        // db.innate_weapons_by_skill dans data.js). Générique : toute nouvelle
+        // compétence ajoutée à cette table sera prise en compte sans code
+        // supplémentaire. Uniquement ajoutée, jamais retirée (même philosophie
+        // que les autres compétences/objets innés ci-dessus), et jamais comptée
+        // dans la limite d'emplacements d'armes (voir getWeaponSlotCost).
+        // Idempotent : recherche par id d'arme avant tout ajout.
+        if (typeof db !== 'undefined' && db.innate_weapons_by_skill) {
+            Object.keys(db.innate_weapons_by_skill).forEach(skillId => {
+                let skillDef = null;
+                Object.keys(db.skills || {}).some(tree => {
+                    let found = (db.skills[tree] || []).find(s => s.id === skillId);
+                    if (found) { skillDef = found; return true; }
+                    return false;
+                });
+                let skillName = skillDef ? skillDef.name.toLowerCase() : null;
+
+                let hasSkill = m.skills.some(s => {
+                    let sid = (typeof s === 'string') ? null : s.id;
+                    let sname = ((typeof s === 'string') ? s : (s.name || '')).toLowerCase();
+                    return sid === skillId || (skillName && sname === skillName);
+                });
+
+                if (hasSkill) {
+                    let weaponDef = db.innate_weapons_by_skill[skillId];
+                    if (!m.weapons) m.weapons = [];
+                    let alreadyHas = m.weapons.some(w => w.id === weaponDef.id);
+                    if (!alreadyHas) {
+                        m.weapons.push(JSON.parse(JSON.stringify(weaponDef)));
+                    }
+                }
+            });
+        }
+
         // Migration grenades : les grenades ne prennent pas d'emplacements d'armes et sont notées dans l'équipement
         if (m.weapons && m.weapons.length > 0) {
             let toMove = [];
@@ -373,6 +407,7 @@ const ensureDeathMaidenPoisonBlood = ensureInnateFighterSkills;
 
 function getWeaponSlotCost(w) {
     if (!w || !w.name) return 1;
+    if (w.isInnateWeapon) return 0;
     if (w.counts_as_equip || w.type === 'Grenade' || (w.id && ((w.id.startsWith('wpn_grenade_') && w.id !== 'wpn_grenade_launcher') || w.id === 'wpn_charge_demo'))) {
         return 0;
     }

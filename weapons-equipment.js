@@ -290,6 +290,9 @@ function buyWeaponOption(weaponIndex, optionName) {
 
 function removeWeapon(idx) {
     let w = tempFighter.weapons[idx];
+    if (w && w.isInnateWeapon) {
+        return showToast(`"${w.name}" est une arme intégrée par une compétence : elle ne peut pas être retirée.`, "error");
+    }
     const isMercOrBeast = isMercOrBeastProfile(tempFighter);
     const isCutterWpn = w.requires_equip === "eq_escher_cutter";
 

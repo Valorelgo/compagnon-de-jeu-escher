@@ -257,6 +257,7 @@ function transferFighterGearToStash(m) {
     if (!currentGang.stash) currentGang.stash = [];
     if (m.weapons && Array.isArray(m.weapons)) {
         m.weapons.forEach(w => {
+            if (w.isInnateWeapon) return;
             let wCost = w.cost_credits || w.cost || 0;
             currentGang.stash.push({ name: w.name, type: "Arme", cost: wCost });
             if (w.accessory) {

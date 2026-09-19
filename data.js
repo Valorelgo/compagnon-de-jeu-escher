@@ -259,6 +259,25 @@ const db = {
         ]
     },
 
+    // ===== ARMES INTÉGRÉES DONNÉES PAR UNE COMPÉTENCE =====
+    // Table de correspondance id de compétence -> arme accordée automatiquement.
+    // Chaque entrée a tous les champs d'une arme normale (id, name, profiles
+    // avec SR/LR/S/AP/L/traits, cost_credits) plus isInnateWeapon: true.
+    // Le mécanisme générique qui l'ajoute au guerrier dès qu'il a la compétence
+    // correspondante (sans jamais compter dans la limite d'emplacements, et de
+    // façon idempotente) est ensureInnateFighterSkills() dans gang-views.js.
+    // Volontairement séparée de db.weapons : ces armes ne doivent jamais
+    // apparaître comme achetables au recrutement, en post-cycle ou au Trading Post.
+    innate_weapons_by_skill: {
+        "sk_coup_boule": {
+            id: "wpn_innate_headbutt",
+            name: "Headbutt",
+            profiles: [{ name: "Unique", SR: "E", LR: "-", S: "S+1", AP: "-", L: 1, traits: "Melee, attaque additionnelle (1)" }],
+            cost_credits: 0,
+            isInnateWeapon: true
+        }
+    },
+
     // ===== ARMES =====
     weapons: [
         { id: "wpn_autogun", name: "Autogun", profiles: [{ name: "Unique", SR: '8"', LR: '24"', S: 3, AP: "-", L: 1, traits: "tir rapide (1)" }], cost_credits: 20, cost_tp: 0, is_gang_weapon: true, is_hive_scum: true },

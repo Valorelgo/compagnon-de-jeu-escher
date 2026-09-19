@@ -28,7 +28,7 @@ function openSkillModal() {
         "sk_tir_precision", "sk_berserker", "sk_soin", "sk_munitions"
     ];
 
-    let html = `<div style="max-height:60vh; overflow-y:auto;">`;
+    let html = `<div>`;
 
     if (isProspectOrBeast) {
         html += `<p style="color:var(--accent-purple); padding:10px; background:#111; border-radius:5px; border:1px solid #333;">
@@ -90,7 +90,7 @@ function openSkillModal() {
     }
 
     html += `</div><br><button class="btn" onclick="closeModal()">Fermer</button>`;
-    openModal("Menu des Compétences (Création)", html);
+    openModal("Menu des Compétences (Création)", html, 'wide');
 }
 
 function toggleSpecialistSkill(skillId, cat) {
@@ -350,7 +350,7 @@ function performRemoveFighter(idx) {
 // ==========================================
 // MODALE & UTILS EXPORT
 // ==========================================
-function openModal(title, content, isLandscape = false) {
+function openModal(title, content, sizeMode = false) {
     const modalTitle = document.getElementById('modal-title');
     const modalBody = document.getElementById('modal-body');
     const modalOverlay = document.getElementById('modal-overlay');
@@ -361,10 +361,11 @@ function openModal(title, content, isLandscape = false) {
     if (modalBody) modalBody.innerHTML = content;
     
     if (modalContent) {
-        if (isLandscape) {
+        modalContent.classList.remove('modal-landscape', 'modal-wide');
+        if (sizeMode === true || sizeMode === 'landscape') {
             modalContent.classList.add('modal-landscape');
-        } else {
-            modalContent.classList.remove('modal-landscape');
+        } else if (sizeMode === 'wide') {
+            modalContent.classList.add('modal-wide');
         }
     }
 

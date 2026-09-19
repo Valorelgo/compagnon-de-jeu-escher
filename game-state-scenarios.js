@@ -550,7 +550,7 @@ function promoteToLeader(fighterId) {
 const SCENARIO_TYPES = {
     intensification: {
         name: "Intensification de la bataille",
-        desc: "Choisissez 3 guerriers. Le programme tirera 1 à 3 guerriers aléatoires. Vous pourrez ensuite choisir jusqu'à 5 renforts."
+        desc: "Choisissez 3 guerriers. Le programme tirera 1 à 3 guerriers aléatoires. Vous pourrez ensuite choisir jusqu'à 5 renforts. D3 renforts arriveront en jeu à partir du second round."
     },
     donnez_tout: {
         name: "Donnez tout !",
@@ -562,7 +562,7 @@ const SCENARIO_TYPES = {
     },
     attaque_surprise: {
         name: "Attaque surprise !",
-        desc: "Attaquant (4 choisis + 4 au hasard) | Défenseur (3 choisis + jusqu'à 7 renforts)."
+        desc: "Attaquant (4 choisis + 4 au hasard) | Défenseur (3 choisis + jusqu'à 7 renforts). D3 renforts arriveront en jeu à partir du second round."
     },
     force_intervention: {
         name: "Force d'intervention",
@@ -578,7 +578,12 @@ let setupState = {
     scenarioKey: 'intensification',
     role: 'attacker',
     step: 1,
-    reconCount: Math.floor(Math.random() * 3) + 1,
+    // Remplace l'ancien tirage aléatoire (Math.random) : le nombre de guerriers
+    // concernés (D3, pour Force de reconnaissance et Intensification) est
+    // désormais saisi manuellement par le joueur, pour que les deux joueurs
+    // utilisent le même nombre (convenu au préalable, ex: en lançant un vrai
+    // dé D3 physique une seule fois pour la table).
+    diceCount: null,
     initialPickedIds: [],
     randomDrawnIds: [],
     reinforcementPickedIds: [],
@@ -598,7 +603,7 @@ function resetSetupState() {
         scenarioKey: 'intensification',
         role: 'attacker',
         step: 1,
-        reconCount: Math.floor(Math.random() * 3) + 1,
+        diceCount: null,
         initialPickedIds: [],
         randomDrawnIds: [],
         reinforcementPickedIds: [],
@@ -845,6 +850,23 @@ function renderGameSetup(container) {
                 </div>
             ` : ''}
 
+            ${(setupState.scenarioKey === 'intensification' || setupState.scenarioKey === 'force_reconnaissance') ? `
+                <div style="margin-bottom:12px; background:#111; border:1px solid ${setupState.diceCount ? '#333' : 'var(--status-danger)'}; padding:10px; border-radius:5px;">
+                    <label style="font-weight:bold; display:block; margin-bottom:6px;">
+                        🎲 Nombre de guerriers concernés (D3) :
+                        <small style="display:block; font-weight:normal; color:#aaa; margin-top:2px;">
+                            À convenir avec votre adversaire (ex : lancez un vrai D3 une seule fois pour la table) afin que les deux joueurs entrent le même nombre.
+                        </small>
+                    </label>
+                    <select id="dice-count-select" style="width:100%; padding:8px; background:#222; color:#fff; border:1px solid var(--accent-purple);" onchange="changeDiceCount(this.value)">
+                        <option value="" ${!setupState.diceCount ? 'selected' : ''}>-- Choisir 1, 2 ou 3 --</option>
+                        <option value="1" ${setupState.diceCount === 1 ? 'selected' : ''}>1</option>
+                        <option value="2" ${setupState.diceCount === 2 ? 'selected' : ''}>2</option>
+                        <option value="3" ${setupState.diceCount === 3 ? 'selected' : ''}>3</option>
+                    </select>
+                </div>
+            ` : ''}
+
             <hr style="border-color:#333; margin:15px 0;">
     `;
 
@@ -867,6 +889,16 @@ function renderStep1View(availableMembers) {
     let key = setupState.scenarioKey;
     let maxSelect = 0;
     let labelHelp = "";
+
+    // Intensification et Force de reconnaissance ont besoin du D3 saisi
+    // manuellement (voir le sélecteur au-dessus) avant de pouvoir continuer.
+    if ((key === 'intensification' || key === 'force_reconnaissance') && !setupState.diceCount) {
+        return `
+            <div style="background:#2d0a0f; border:1px solid var(--status-danger); border-radius:6px; padding:14px; text-align:center; color:#ff6b6b;">
+                🎲 Veuillez d'abord choisir le nombre de guerriers concernés (D3) ci-dessus, en accord avec votre adversaire.
+            </div>
+        `;
+    }
 
     if (key === 'intensification') {
         let req = Math.min(3, availableMembers.length);
@@ -893,9 +925,9 @@ function renderStep1View(availableMembers) {
         labelHelp = "Choisissez jusqu'à 5 guerriers.";
     }
     else if (key === 'force_reconnaissance') { 
-        let req = Math.min(setupState.reconCount, availableMembers.length);
+        let req = Math.min(setupState.diceCount, availableMembers.length);
         maxSelect = req;
-        labelHelp = `🎲 Tirage Force de reconnaissance : vous devez choisir ${req} guerrier(s).`; 
+        labelHelp = `🎲 D3 = ${setupState.diceCount} : vous devez choisir ${req} guerrier(s).`; 
     }
 
     let html = `
@@ -1018,6 +1050,11 @@ function changeRole(role) {
     renderGameSetup(document.getElementById('main-content'));
 }
 
+function changeDiceCount(val) {
+    setupState.diceCount = val ? parseInt(val, 10) : null;
+    renderGameSetup(document.getElementById('main-content'));
+}
+
 function toggleInitialPick(id, maxLimit) {
     let idx = setupState.initialPickedIds.indexOf(id);
     if (idx >= 0) {
@@ -1074,8 +1111,8 @@ function validateStep1() {
     if (key === 'intensification') {
         let req = Math.min(3, availableMembers.length);
         if (setupState.initialPickedIds.length !== req) return showToast(`Veuillez choisir exactement ${req} guerrier(s).`, "error");
-        let nbRandom = Math.floor(Math.random() * 3) + 1;
-        let drawn = getRandomFighters(remainingPool, nbRandom);
+        if (!setupState.diceCount) return showToast("Veuillez d'abord choisir le nombre de guerriers concernés (D3).", "error");
+        let drawn = getRandomFighters(remainingPool, setupState.diceCount);
         setupState.randomDrawnIds = drawn.map(m => m.id);
     } 
     else if (key === 'patrouille') {
@@ -1096,7 +1133,8 @@ function validateStep1() {
         }
     }
     else if (key === 'force_reconnaissance') {
-        let req = Math.min(setupState.reconCount, availableMembers.length);
+        if (!setupState.diceCount) return showToast("Veuillez d'abord choisir le nombre de guerriers concernés (D3).", "error");
+        let req = Math.min(setupState.diceCount, availableMembers.length);
         if (setupState.initialPickedIds.length !== req) return showToast(`Veuillez choisir exactement ${req} guerrier(s).`, "error");
         let drawn = getRandomFighters(remainingPool, 5);
         setupState.randomDrawnIds = drawn.map(m => m.id);
