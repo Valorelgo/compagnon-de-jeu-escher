@@ -26,6 +26,19 @@ function renderGameView(container) {
                 </div>
             </div>
 
+            <!-- BANDEAU TERRITOIRE DE LA BATAILLE -->
+            ${(() => {
+                if (!currentGameTerritoryId) return '';
+                let tDef = (typeof getTerritoryDef === 'function') ? getTerritoryDef(currentGameTerritoryId) : null;
+                if (!tDef) return '';
+                return `
+                    <div style="margin-top:10px; background:linear-gradient(90deg, #1a1030, #0f1a2e); border:1px solid var(--accent-purple); border-radius:6px; padding:8px 12px; display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+                        <span style="font-size:13px; font-weight:bold; color:var(--accent-cyan); text-transform:uppercase; letter-spacing:0.5px; white-space:nowrap;">🗺️ ${tDef.name}</span>
+                        <span style="font-size:12px; color:#ddd;">${tDef.battleEffect || 'Aucun effet en jeu.'}</span>
+                    </div>
+                `;
+            })()}
+
             <!-- BANDEAU SCORE ET PRIORITÉ -->
             ${renderGameScorePriorityBanner()}
 
@@ -855,6 +868,13 @@ function processEndGame() {
                     seriouslyInjured: (battleFighter.liveXP && battleFighter.liveXP.seriouslyInjured) || 0,
                     scenario: (battleFighter.liveXP && battleFighter.liveXP.scenario) || 0,
                     ooaKills: (battleFighter.liveXP && battleFighter.liveXP.ooaKills) || 0,
+                    territoryBonusXp: (() => {
+                        if (!currentGameTerritoryId) return 0;
+                        let tDef = (typeof getTerritoryDef === 'function') ? getTerritoryDef(currentGameTerritoryId) : null;
+                        if (!tDef || !tDef.battleBonusXpPerCasualty) return 0;
+                        let lx = battleFighter.liveXP || {};
+                        return ((lx.seriouslyInjured || 0) + (lx.ooaKills || 0)) * tDef.battleBonusXpPerCasualty;
+                    })(),
                     status: battleFighter.status,
                     wasSeriouslyInjuredWhenFled: !!battleFighter.wasSeriouslyInjuredWhenFled
                 };

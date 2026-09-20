@@ -7,6 +7,11 @@
 
 let currentGameRoster = [];
 let gameTactics = [];
+// Territoire sur lequel se déroule la partie en cours (menu déroulant de mise
+// en place, voir setupState.territoryEffectId) : détermine la règle spéciale
+// affichée pendant la partie, et alimente certains calculs automatiques
+// (bonus de Ld, crédits par ennemi OOA, XP bonus - voir db.territories).
+let currentGameTerritoryId = null;
 let gameScores = {
     myScore: 0,
     opponentScore: 0,
@@ -578,6 +583,9 @@ let setupState = {
     scenarioKey: 'intensification',
     role: 'attacker',
     step: 1,
+    // Territoire sur lequel se déroule la bataille (voir currentGameTerritoryId
+    // ci-dessus) : demandé en tout premier, avant même le scénario.
+    territoryEffectId: null,
     // Remplace l'ancien tirage aléatoire (Math.random) : le nombre de guerriers
     // concernés (D3, pour Force de reconnaissance et Intensification) est
     // désormais saisi manuellement par le joueur, pour que les deux joueurs
@@ -603,6 +611,7 @@ function resetSetupState() {
         scenarioKey: 'intensification',
         role: 'attacker',
         step: 1,
+        territoryEffectId: null,
         diceCount: null,
         initialPickedIds: [],
         randomDrawnIds: [],
@@ -810,6 +819,20 @@ function renderGameSetup(container) {
             </div>
             ${isQuick ? `<p style="color:#aaa; font-size:13px; margin-bottom:12px;">Même sélection de scénarios, règles de recrutement d'escouade et cartes tactiques que le mode campagne, sans impact sur les crédits, XP ni blessures permanentes du gang.</p>` : ''}
             
+            <div style="margin-bottom:12px; background:#111; border:1px solid ${setupState.territoryEffectId ? '#333' : 'var(--status-danger)'}; padding:10px; border-radius:5px;">
+                <label style="font-weight:bold; display:block; margin-bottom:6px;">🗺️ Territoire de la bataille :</label>
+                <select id="territory-effect-select" style="width:100%; padding:8px; background:#222; color:#fff; border:1px solid var(--accent-purple);" onchange="changeTerritoryEffect(this.value)">
+                    <option value="" ${!setupState.territoryEffectId ? 'selected' : ''}>-- Choisir le territoire --</option>
+                    ${(db.territories || []).map(t => `
+                        <option value="${t.id}" ${setupState.territoryEffectId === t.id ? 'selected' : ''}>${t.name}</option>
+                    `).join('')}
+                </select>
+                ${setupState.territoryEffectId ? (() => {
+                    let tDef = getTerritoryDef(setupState.territoryEffectId);
+                    return tDef ? `<div style="margin-top:8px; font-size:12px; color:#ccc;"><strong style="color:var(--accent-cyan);">Règle en jeu :</strong> ${tDef.battleEffect || 'Aucun effet en jeu.'}</div>` : '';
+                })() : ''}
+            </div>
+
             <div style="margin-bottom:12px;">
                 <label style="font-weight:bold;">Type de recrutement / Scénario :</label>
                 <select id="scenario-select" style="width:100%; padding:8px; margin-top:4px; background:#222; color:#fff; border:1px solid var(--accent-purple);" onchange="changeScenario(this.value)">
@@ -889,6 +912,15 @@ function renderStep1View(availableMembers) {
     let key = setupState.scenarioKey;
     let maxSelect = 0;
     let labelHelp = "";
+
+    // Le territoire de la bataille doit être choisi en tout premier.
+    if (!setupState.territoryEffectId) {
+        return `
+            <div style="background:#2d0a0f; border:1px solid var(--status-danger); border-radius:6px; padding:14px; text-align:center; color:#ff6b6b;">
+                🗺️ Veuillez d'abord choisir le territoire de la bataille ci-dessus.
+            </div>
+        `;
+    }
 
     // Intensification et Force de reconnaissance ont besoin du D3 saisi
     // manuellement (voir le sélecteur au-dessus) avant de pouvoir continuer.
@@ -1039,8 +1071,10 @@ function renderStep2View(availableMembers) {
 }
 
 function changeScenario(key) {
+    let preservedTerritory = setupState.territoryEffectId;
     resetSetupState();
     setupState.scenarioKey = key;
+    setupState.territoryEffectId = preservedTerritory;
     renderGameSetup(document.getElementById('main-content'));
 }
 
@@ -1052,6 +1086,11 @@ function changeRole(role) {
 
 function changeDiceCount(val) {
     setupState.diceCount = val ? parseInt(val, 10) : null;
+    renderGameSetup(document.getElementById('main-content'));
+}
+
+function changeTerritoryEffect(val) {
+    setupState.territoryEffectId = val || null;
     renderGameSetup(document.getElementById('main-content'));
 }
 
@@ -1153,6 +1192,7 @@ function startGame() {
     }
 
     currentGameRoster = [];
+    currentGameTerritoryId = setupState.territoryEffectId || null;
     gameScores = {
         myScore: 0,
         opponentScore: 0,
@@ -1385,6 +1425,17 @@ function adjLiveXP(fighterIdx, key, delta) {
 function getFighterBattleXP(m) {
     if (!m) return 1;
     let lx = m.liveXP || { assistance: 0, objective: 0, seriouslyInjured: 0, scenario: 0, ooaKills: 0 };
-    return 1 + (lx.assistance || 0) + (lx.objective || 0) + (lx.seriouslyInjured || 0) + (lx.scenario || 0) + ((lx.ooaKills || 0) * 2);
+    let total = 1 + (lx.assistance || 0) + (lx.objective || 0) + (lx.seriouslyInjured || 0) + (lx.scenario || 0) + ((lx.ooaKills || 0) * 2);
+
+    // Territoire Fighting pit : +1 XP supplémentaire par Sérieusement blessé
+    // ET par OOA infligé (en plus du calcul normal ci-dessus).
+    if (currentGameTerritoryId) {
+        let tDef = (typeof getTerritoryDef === 'function') ? getTerritoryDef(currentGameTerritoryId) : null;
+        if (tDef && tDef.battleBonusXpPerCasualty) {
+            total += ((lx.seriouslyInjured || 0) + (lx.ooaKills || 0)) * tDef.battleBonusXpPerCasualty;
+        }
+    }
+
+    return total;
 }
 

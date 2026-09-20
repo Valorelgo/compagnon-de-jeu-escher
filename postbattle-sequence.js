@@ -80,6 +80,7 @@ function renderPostBattleView(container) {
                                 if (gain.assistance > 0) details.push(`+${gain.assistance} (Assistance)`);
                                 if (gain.objective > 0) details.push(`+${gain.objective} (Objectif)`);
                                 if (gain.scenario > 0) details.push(`+${gain.scenario} (Scénario)`);
+                                if (gain.territoryBonusXp > 0) details.push(`+${gain.territoryBonusXp} (Territoire : Fighting pit)`);
 
                                 let statusBadge = '';
                                 if (gain.status === 'Fuyard') {
@@ -192,6 +193,17 @@ function renderPostBattleView(container) {
                         <label style="font-size:12px;">Ennemis mis OOA (calculé) :</label>
                         <input type="text" value="${totalEnemiesOOA}" disabled style="width:100%; padding:4px; background:#222; color:#2ecc71; font-weight:bold;">
                     </div>
+                    ${(() => {
+                        let tDef = (currentGameTerritoryId && typeof getTerritoryDef === 'function') ? getTerritoryDef(currentGameTerritoryId) : null;
+                        if (!tDef || !tDef.battleCreditsPerOOA) return '';
+                        let bonus = totalEnemiesOOA * tDef.battleCreditsPerOOA;
+                        return `
+                            <div>
+                                <label style="font-size:12px;">Bonus territoire (${tDef.name}) :</label>
+                                <input type="text" value="+${bonus} cr (ajouté automatiquement)" disabled style="width:100%; padding:4px; background:#222; color:#f39c12; font-weight:bold;">
+                            </div>
+                        `;
+                    })()}
                     <div>
                         <label style="font-size:12px;">Variation Réputation (+/-) :</label>
                         <input type="number" id="hist-rep" value="0" style="width:100%; padding:4px;" placeholder="+1, -1...">

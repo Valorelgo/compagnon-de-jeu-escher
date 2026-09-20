@@ -714,7 +714,18 @@ function saveMatchToHistory() {
 
     let credPrimary = parseInt(document.getElementById('hist-cred-primary')?.value) || 0;
     let credSecondary = parseInt(document.getElementById('hist-cred-secondary')?.value) || 0;
-    let totalCredits = credPrimary + credSecondary;
+
+    // Territoire Corpse farm : +X crédits par ennemi mis OOA, ajoutés
+    // automatiquement (voir db.territories -> battleCreditsPerOOA).
+    let territoryCreditsBonus = 0;
+    if (currentGameTerritoryId) {
+        let tDef = (typeof getTerritoryDef === 'function') ? getTerritoryDef(currentGameTerritoryId) : null;
+        if (tDef && tDef.battleCreditsPerOOA) {
+            let totalEnemiesOOA = (currentGameRoster || []).reduce((sum, m) => sum + ((m.liveXP && m.liveXP.ooaKills) ? m.liveXP.ooaKills : 0), 0);
+            territoryCreditsBonus = totalEnemiesOOA * tDef.battleCreditsPerOOA;
+        }
+    }
+    let totalCredits = credPrimary + credSecondary + territoryCreditsBonus;
 
     let repChange = parseInt(document.getElementById('hist-rep')?.value) || 0;
 
@@ -749,6 +760,7 @@ function saveMatchToHistory() {
         result: result,
         primaryCredits: credPrimary,
         secondaryCredits: credSecondary,
+        territoryCreditsBonus: territoryCreditsBonus,
         totalCredits: totalCredits,
         repChange: repChange,
         territory: territorySummary

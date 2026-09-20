@@ -193,7 +193,10 @@ function openFighterDetailModal(idx) {
                                         <td>${armorDeltas && armorDeltas.I !== undefined ? formatStatWithArmorDelta(st.I, armorDeltas.I) : (st.I||'-')}</td>
                                         <td>${m.conditions && m.conditions['Frénésie'] ? formatStatWithArmorDelta(st.A, 1) : (st.A||'-')}</td>
                                         <td>${armorDeltas && armorDeltas.Sv !== undefined ? formatStatWithArmorDelta(st.Sv, armorDeltas.Sv) : (st.Sv||'-')}</td>
-                                        <td>${st.Ld||'-'}</td><td>${st.Cl||'-'}</td><td>${st.Wil||'-'}</td>
+                                        <td>${(() => {
+                                            let tDef = (currentGameTerritoryId && typeof getTerritoryDef === 'function') ? getTerritoryDef(currentGameTerritoryId) : null;
+                                            return (tDef && tDef.battleLdBonus) ? formatStatWithArmorDelta(st.Ld, tDef.battleLdBonus) : (st.Ld||'-');
+                                        })()}</td><td>${st.Cl||'-'}</td><td>${st.Wil||'-'}</td>
                                         <td>${st.Int||'-'}</td>
                                     </tr>
                                 </tbody>
