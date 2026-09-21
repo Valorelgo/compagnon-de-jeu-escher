@@ -382,6 +382,58 @@ function actionReputationBonus() {
     renderPostCycleView(document.getElementById('main-content'));
 }
 
+// Cycle de pause : événement de milieu de campagne (pas un bonus "par cycle"
+// comme la réputation ci-dessus) — le flag currentGang.pauseCycleUsed est donc
+// persistant sur le gang, pas remis à zéro à chaque nouveau cycle.
+function actionPauseCycle() {
+    if (!currentGang) return;
+
+    if (!currentGang.pauseCycleUsed) {
+        showConfirmModal(
+            "⏸️ Cycle de pause",
+            `Confirmez-vous qu'il s'agit bien du <strong>cycle de pause</strong> (milieu de campagne) ?<br><br>
+            <small style="color:#aaa;">Le gang recevra <strong style="color:var(--accent-cyan);">250 crédits</strong> à dépenser en guerriers et équipements.</small>`,
+            "Valider",
+            () => {
+                currentGang.credits = (currentGang.credits || 0) + 250;
+                currentGang.pauseCycleUsed = true;
+                safeSave();
+                showToast("Cycle de pause validé : +250 crédits pour le gang !", "success");
+                renderPostCycleView(document.getElementById('main-content'));
+            }
+        );
+    } else {
+        showConfirmModal(
+            "⚠️ Cycle de pause déjà utilisé",
+            `Attention, vous avez déjà utilisé le cycle de pause. Êtes-vous sûr de vouloir continuer ?<br><br>
+            <small style="color:#aaa;">Le gang recevra à nouveau <strong style="color:var(--accent-cyan);">250 crédits</strong>.</small>`,
+            "Valider quand même",
+            () => {
+                currentGang.credits = (currentGang.credits || 0) + 250;
+                safeSave();
+                showToast("Cycle de pause validé à nouveau : +250 crédits pour le gang !", "success");
+                renderPostCycleView(document.getElementById('main-content'));
+            }
+        );
+    }
+}
+
+function actionUndoPauseCycle() {
+    if (!currentGang) return;
+    showConfirmModal(
+        "↩️ Annuler le cycle de pause",
+        `Retirer <strong>250 crédits</strong> au gang et remettre le bouton "Cycle de pause" à disposition ?`,
+        "Confirmer",
+        () => {
+            currentGang.credits = Math.max(0, (currentGang.credits || 0) - 250);
+            currentGang.pauseCycleUsed = false;
+            safeSave();
+            showToast("Cycle de pause annulé : -250 crédits.", "success");
+            renderPostCycleView(document.getElementById('main-content'));
+        }
+    );
+}
+
 function collectAllTerritoryIncome() {
     if (!currentGang || !currentGang.territories) return;
     if (!postCycleSession.territoryUsed) postCycleSession.territoryUsed = {};

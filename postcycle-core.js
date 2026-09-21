@@ -88,6 +88,15 @@ function renderPostCycleView(container) {
                         🏆 <strong>Bonus de Réputation</strong> (+${(typeof calculateGangReputation === 'function' ? calculateGangReputation(currentGang) : (currentGang.reputation || 1)) * 10} cr)<br>
                         <small>${postCycleSession.reputationBonusUsed ? 'Déjà récolté ce cycle' : "10x la réputation du gang, une fois par cycle"}</small>
                     </button>
+                    <button class="btn ${currentGang.pauseCycleUsed ? '' : 'btn-cyan'}" style="width:100%; text-align:left; margin-top:8px; ${currentGang.pauseCycleUsed ? 'opacity:0.55;' : ''}" onclick="actionPauseCycle()">
+                        ⏸️ <strong>Cycle de pause</strong> (+250 cr)<br>
+                        <small>${currentGang.pauseCycleUsed ? 'Déjà utilisé pour ce gang — cliquez pour recommencer quand même' : "Milieu de campagne : le gang reçoit 250 crédits à dépenser en guerriers et équipements."}</small>
+                    </button>
+                    ${currentGang.pauseCycleUsed ? `
+                    <button class="btn-danger" style="width:100%; text-align:left; margin-top:6px; font-size:12px; padding:6px 10px;" onclick="actionUndoPauseCycle()">
+                        ↩️ Cycle de pause fait par erreur ? (-250 cr)
+                    </button>
+                    ` : ''}
                 </div>
 
                 <div style="background:var(--bg-dark, #111); padding:12px; border-radius:6px; border:1px solid #333;">
