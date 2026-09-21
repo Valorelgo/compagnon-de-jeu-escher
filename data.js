@@ -97,7 +97,7 @@ const db = {
         {
             id: "char_gun_maiden",
             name: "Gun maiden",
-            stats: { M: '5"', WS: '4+', BS: '4+', S: 3, T: 3, W: 1, I: 4, A: 1, Sv: '6+', Ld: 7, Cl: 6, Wil: 6, Int: 6 },
+            stats: { M: '5"', WS: '4+', BS: '4+', S: 3, T: 3, W: 1, I: 4, A: 1, Sv: '6+', Ld: 6, Cl: 7, Wil: 6, Int: 6 },
             type: ["Guerrier", "ganger"],
             starting_xp: 19,
             starting_skill: "Hip-shooting, Lightning reflexes",
