@@ -164,6 +164,7 @@ function openFighterDetailModal(idx) {
                             <option value="Out of action" ${m.status === 'Out of action' ? 'selected' : ''}>Out of action</option>
                             <option value="Fuyard" ${m.status === 'Fuyard' ? 'selected' : ''}>🏃 Fuyard</option>
                         </select>
+                        ${m.status === 'Sérieusement blessé' ? `<button class="btn-danger" style="padding:4px 10px; font-size:11px; margin:0;" onclick="attemptLeaveCombat(${idx})" title="Jet D6 : 1-2 Hors de combat, 3-6 indemne">🎲 Tenter de quitter le combat</button>` : ''}
                     </div>
                 </div>
             </div>
@@ -410,6 +411,48 @@ function updateFighterStatus(idx, val) {
             triggerOutOfActionAlert(currentGameRoster[idx], isModalOpen ? idx : null);
         }
     }
+}
+
+// Un guerrier Sérieusement blessé peut tenter de quitter le combat avant la
+// fin de la partie, dans les mêmes conditions que le jet de fin de partie
+// (voir postbattle-sequence.js) : D6, 1-2 = Hors de combat, 3-6 = indemne.
+function attemptLeaveCombat(idx) {
+    let m = currentGameRoster[idx];
+    if (!m || m.status !== 'Sérieusement blessé') return;
+
+    let html = `
+        <div style="padding:6px 0;">
+            <p style="margin-bottom:14px; line-height:1.5;">
+                <strong>${m.customName}</strong> tente de quitter le combat.<br>
+                <span style="color:#aaa; font-size:13px;">Jetez un D6 physique : sur <strong>1-2</strong>, il finit Hors de Combat. Sinon (<strong>3-6</strong>), il s'en sort indemne.</span>
+            </p>
+            <div style="display:flex; gap:10px; flex-wrap:wrap;">
+                <button class="btn-danger" style="flex:1; padding:10px;" onclick="resolveLeaveCombatAttempt(${idx}, false)">1-2 : Hors de combat</button>
+                <button class="btn btn-cyan" style="flex:1; padding:10px;" onclick="resolveLeaveCombatAttempt(${idx}, true)">3-6 : Indemne</button>
+            </div>
+        </div>
+    `;
+    openModal("🎲 Tentative de fuite", html);
+}
+
+function resolveLeaveCombatAttempt(idx, survived) {
+    let m = currentGameRoster[idx];
+    if (!m) return;
+    if (typeof closeModal === 'function') closeModal();
+
+    if (survived) {
+        updateFighterStatus(idx, 'Fuyard');
+        // Contrairement à une fuite "normale" depuis Sérieusement blessé,
+        // celle-ci a réussi le jet : le guerrier est protégé (pas de blessure
+        // permanente requise en fin de partie), comme un fuyard qui n'était
+        // pas sérieusement blessé au moment de fuir.
+        if (currentGameRoster[idx]) currentGameRoster[idx].wasSeriouslyInjuredWhenFled = false;
+        showToast(`${m.customName} quitte le combat indemne !`, "success");
+    } else {
+        updateFighterStatus(idx, 'Out of action');
+        showToast(`${m.customName} est mis Hors de Combat en tentant de fuir !`, "error");
+    }
+    renderGameView(document.getElementById('main-content'));
 }
 
 function toggleCombatAmmo(fIdx, listType, itemIndex) {

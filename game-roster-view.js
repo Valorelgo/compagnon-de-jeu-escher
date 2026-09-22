@@ -827,6 +827,11 @@ function processEndGame() {
                 // sérieusement blessés au moment où ils ont fui !
                 let isOOA = false;
                 let ooaReason = null;
+                // Un guerrier qui termine la partie encore Sérieusement blessé
+                // (ni fuyard, ni déjà Out of action) doit faire le jet D6
+                // "1-2 : Hors de combat / 3-6 : indemne" en après-bataille,
+                // avant qu'on sache s'il compte comme OOA (voir renderPostBattleView).
+                let pendingSeriousInjuryRoll = false;
 
                 if (battleFighter.status === 'Fuyard') {
                     if (battleFighter.wasSeriouslyInjuredWhenFled === true) {
@@ -839,6 +844,8 @@ function processEndGame() {
                 } else if (battleFighter.status === 'Out of action' || (battleFighter.currentHP <= 0 && battleFighter.status !== 'Fuyard')) {
                     isOOA = true;
                     ooaReason = 'hors_de_combat';
+                } else if (battleFighter.status === 'Sérieusement blessé') {
+                    pendingSeriousInjuryRoll = true;
                 }
 
                 // Un familier ne prend jamais de blessure permanente : il ne doit
@@ -846,10 +853,12 @@ function processEndGame() {
                 if (gangFighter.isFamiliar) {
                     isOOA = false;
                     ooaReason = null;
+                    pendingSeriousInjuryRoll = false;
                 }
 
                 gangFighter.ooa = isOOA;
                 gangFighter.ooaReason = ooaReason;
+                gangFighter.pendingSeriousInjuryRoll = pendingSeriousInjuryRoll;
 
                 // RÈGLE EXPÉRIENCE : Un combattant ne peut JAMAIS perdre l'XP acquise pendant la partie.
                 // Même s'il finit Hors de combat ou Fuyard, il conserve l'intégralité de son XP de participation (1 XP)
