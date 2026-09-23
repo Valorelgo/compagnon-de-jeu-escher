@@ -1418,7 +1418,10 @@ function adjLiveXP(fighterIdx, key, delta) {
     if (!m.liveXP) {
         m.liveXP = { assistance: 0, objective: 0, seriouslyInjured: 0, scenario: 0, ooaKills: 0 };
     }
-    m.liveXP[key] = Math.max(0, (m.liveXP[key] || 0) + delta);
+    let newVal = Math.max(0, (m.liveXP[key] || 0) + delta);
+    // L'XP d'Objectif ne peut être gagnée qu'une seule fois par partie.
+    if (key === 'objective') newVal = Math.min(1, newVal);
+    m.liveXP[key] = newVal;
     renderGameView(document.getElementById('main-content'));
 }
 
