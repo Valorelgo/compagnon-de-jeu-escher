@@ -239,13 +239,14 @@ function openFighterDetailModal(idx) {
                             <table style="margin:0;">
                                 <thead>
                                     <tr>
-                                        <th style="width: 28%; text-align:left; padding-left:6px;">Arme</th>
+                                        <th style="width: 22%; text-align:left; padding-left:6px;">Arme</th>
+                                        <th style="width: 12%;">Profil</th>
                                         <th style="width: 8%;">SR</th>
                                         <th style="width: 8%;">LR</th>
                                         <th style="width: 8%;">S</th>
                                         <th style="width: 8%;">AP</th>
                                         <th style="width: 8%;">D</th>
-                                        <th style="width: 20%;">Traits</th>
+                                        <th style="width: 18%;">Traits</th>
                                         <th style="width: 16%;">Munitions</th>
                                     </tr>
                                 </thead>
@@ -277,12 +278,12 @@ function openFighterDetailModal(idx) {
                                         `;
 
                                         return profiles.map((prof, pIdx) => {
-                                            const profLabel = (hasMultipleProfiles && prof.name && prof.name.toLowerCase() !== 'unique')
-                                                ? `<br><small style="color:#aaa;">- ${prof.name}</small>` : '';
+                                            const profLabel = (hasMultipleProfiles && prof.name && prof.name.toLowerCase() !== 'unique') ? prof.name : '';
                                             return `
                                             <tr>
                                                 ${pIdx === 0 ? `<td rowspan="${profiles.length}" style="text-align:left; padding-left:6px; vertical-align:top;"><strong>${w.name}</strong>${badge}${accText}</td>` : ''}
-                                                <td>${prof.SR}${profLabel}</td>
+                                                <td><small style="color:#aaa;">${profLabel}</small></td>
+                                                <td>${prof.SR}</td>
                                                 <td>${prof.LR}</td>
                                                 <td>${prof.S}</td>
                                                 <td>${prof.AP}</td>
