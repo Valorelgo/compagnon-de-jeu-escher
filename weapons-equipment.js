@@ -537,6 +537,182 @@ function removeWeaponAccessory(weaponIdx) {
 }
 
 // ==========================================
+// POISONS & MUNITIONS GAZEUSES (accessoires Escher)
+// ==========================================
+// Distincts de l'accessoire normal (w.accessory) : stockés séparément sur
+// w.poisonAccessory / w.gasAccessory, ne comptent jamais dans la limite d'1
+// accessoire par arme (voir openWeaponAccessoryModal), mais une même arme ne
+// peut avoir qu'1 seul poison ET qu'1 seul gaz actifs à la fois chacun.
+// category vaut 'poison' ou 'gas'.
+function getPoisonGasCategoryConfig(category) {
+    if (category === 'poison') {
+        return {
+            field: 'poisonAccessory',
+            list: (typeof db !== 'undefined' && db.weapon_poisons) ? db.weapon_poisons : [],
+            label: 'Poison',
+            icon: '☠'
+        };
+    }
+    return {
+        field: 'gasAccessory',
+        list: (typeof db !== 'undefined' && db.weapon_gas_munitions) ? db.weapon_gas_munitions : [],
+        label: 'Munition gazeuse',
+        icon: '☁'
+    };
+}
+
+function openPoisonGasModal(weaponIdx, category) {
+    const weapon = tempFighter.weapons[weaponIdx];
+    if (!weapon) return;
+    const cfg = getPoisonGasCategoryConfig(category);
+
+    let html = `<p>Arme concernée : <strong>${weapon.name}</strong></p>`;
+
+    if (weapon[cfg.field]) {
+        let current = weapon[cfg.field];
+        html += `
+            <div style="background:#221818; border:1px solid #c0392b; border-radius:4px; padding:12px; margin-bottom:15px;">
+                <p style="color:#e74c3c; font-weight:bold; margin-bottom:6px;">⚠️ Cette arme a déjà un ${cfg.label.toLowerCase()} équipé :</p>
+                <p style="margin-left:10px;">• <strong>${current.name}</strong> ${current.effect ? `— <small style="color:#aaa;">${current.effect}</small>` : ''}</p>
+                <p style="font-size:12px; color:#ccc; margin-top:8px;">Une arme ne peut avoir qu'un seul ${cfg.label.toLowerCase()} actif à la fois. Retirez-le d'abord pour en choisir un autre.</p>
+                <button class="btn-danger" style="margin-top:10px; padding:5px 12px;" onclick="removePoisonGas(${weaponIdx}, '${category}'); openPoisonGasModal(${weaponIdx}, '${category}');">Retirer le ${cfg.label.toLowerCase()}</button>
+            </div>
+        `;
+        return openModal(`${cfg.icon} ${cfg.label} pour ${weapon.name}`, html);
+    }
+
+    const isCampaign = currentGang && currentGang.isEstablished;
+    if (!currentGang.stash) currentGang.stash = [];
+
+    let stashOptions = currentGang.stash.filter(item => {
+        if (typeof item !== 'object' || item.poisonGasCategory !== category) return false;
+        if (category === 'poison') return (typeof isPoisonCompatibleWithWeapon === 'function') && isPoisonCompatibleWithWeapon(weapon);
+        return (typeof isGasMunitionCompatibleWithWeapon === 'function') && isGasMunitionCompatibleWithWeapon(item.id, weapon);
+    });
+
+    if (stashOptions.length > 0 || isCampaign) {
+        html += `<h4 style="color:var(--accent-cyan);">1. Réserve du Gang (Stash) :</h4>`;
+        if (stashOptions.length === 0) {
+            html += `<p style="color:#888; font-size:12px; margin-bottom:10px;">Aucun ${cfg.label.toLowerCase()} compatible disponible dans la réserve.</p>`;
+        } else {
+            stashOptions.forEach(item => {
+                let cleanName = escapeForJsStr(item.name);
+                html += `
+                    <div class="fighter-item">
+                        <span><strong>${item.name}</strong> <small style="color:#2ecc71;">(Réserve - 0 cr)</small> ${item.usedThisCycle ? '<small style="color:#888;">— déjà utilisé ce cycle</small>' : ''}</span>
+                        <button class="btn-cyan" onclick="addPoisonGasFromStash(${weaponIdx}, '${cleanName}', '${category}')">Équiper (Gratuit)</button>
+                    </div>
+                `;
+            });
+        }
+        html += `<hr style="margin:15px 0; border-color:#333;"><h4 style="color:var(--accent-purple);">2. Acheter sur la Liste de Clan :</h4>`;
+    }
+
+    let options = cfg.list.filter(acc => {
+        if (category === 'poison') return (typeof isPoisonCompatibleWithWeapon === 'function') && isPoisonCompatibleWithWeapon(weapon);
+        return (typeof isGasMunitionCompatibleWithWeapon === 'function') && isGasMunitionCompatibleWithWeapon(acc.id, weapon);
+    });
+
+    html += `<p style="font-size:12px; color:#aaa; margin-bottom:10px;"><em>Ne compte pas dans la limite d'1 accessoire par arme, et n'occupe aucun emplacement.</em></p>`;
+
+    if (options.length === 0) {
+        html += `<p style="color:#888; font-size:12px;">Aucune option compatible avec cette arme${category === 'gas' ? ' (trait gaz requis, gabarit en plus pour Lifting)' : ' (trait toxine (X+) requis)'}.</p>`;
+    } else {
+        options.forEach(acc => {
+            let cost = acc.cost_credits || 0;
+            let canAfford = !isCampaign || ((currentGang.credits || 0) >= cost);
+            html += `
+                <div class="fighter-item ${!canAfford ? 'disabled' : ''}">
+                    <span><strong>${acc.name}</strong> (${cost}c) - <small style="color:#aaa;">${acc.effect || ''}</small></span>
+                    ${canAfford
+                        ? `<button onclick="addPoisonGas(${weaponIdx}, '${acc.id}', '${category}')">${isCampaign ? `Acheter (${cost}c)` : 'Équiper'}</button>`
+                        : `<small style="color:#e74c3c;">Crédits insuffisants</small>`
+                    }
+                </div>
+            `;
+        });
+    }
+
+    openModal(`${cfg.icon} ${cfg.label} pour ${weapon.name}`, html);
+}
+
+function addPoisonGas(weaponIdx, accId, category) {
+    if (!tempFighter || !tempFighter.weapons || !tempFighter.weapons[weaponIdx]) return;
+    const cfg = getPoisonGasCategoryConfig(category);
+    if (tempFighter.weapons[weaponIdx][cfg.field]) {
+        showToast(`Une arme ne peut avoir qu'un seul ${cfg.label.toLowerCase()} actif à la fois.`, "error");
+        return;
+    }
+
+    const acc = cfg.list.find(a => a.id === accId);
+    if (!acc) return;
+
+    let newAcc = JSON.parse(JSON.stringify(acc));
+    newAcc.fromStash = false;
+    newAcc.usedThisCycle = false;
+    tempFighter.weapons[weaponIdx][cfg.field] = newAcc;
+    closeModal();
+    renderFighterEdit(document.getElementById('main-content'));
+}
+
+// Reprend un poison/munition gazeuse depuis la réserve du gang (gratuit) :
+// même logique que addWeaponAccessoryFromStash, mais pour w.poisonAccessory /
+// w.gasAccessory. Préserve usedThisCycle : un poison déjà utilisé ce cycle
+// et renvoyé au stash reste verrouillé tant qu'on ne le rééquipe pas juste
+// pour le regarder — impossible de "réinitialiser" son usage en le
+// déséquipant puis rééquipant dans le même cycle.
+function addPoisonGasFromStash(weaponIdx, itemName, category) {
+    if (!currentGang || !currentGang.stash || !tempFighter || !tempFighter.weapons || !tempFighter.weapons[weaponIdx]) return;
+    const cfg = getPoisonGasCategoryConfig(category);
+    if (tempFighter.weapons[weaponIdx][cfg.field]) {
+        showToast(`Une arme ne peut avoir qu'un seul ${cfg.label.toLowerCase()} actif à la fois.`, "error");
+        return;
+    }
+
+    let sIdx = currentGang.stash.findIndex(item => typeof item === 'object' && item.name === itemName && item.poisonGasCategory === category);
+    if (sIdx >= 0) {
+        let stashItem = currentGang.stash[sIdx];
+        currentGang.stash.splice(sIdx, 1);
+
+        let baseDef = cfg.list.find(a => a.id === stashItem.id) || { name: stashItem.name, cost_credits: stashItem.cost || 0, effect: '' };
+        let newAcc = JSON.parse(JSON.stringify(baseDef));
+        newAcc.fromStash = true;
+        newAcc.usedThisCycle = !!stashItem.usedThisCycle;
+        tempFighter.weapons[weaponIdx][cfg.field] = newAcc;
+        saveGangs();
+    }
+    closeModal();
+    renderFighterEdit(document.getElementById('main-content'));
+}
+
+function removePoisonGas(weaponIdx, category) {
+    const cfg = getPoisonGasCategoryConfig(category);
+    let weapon = tempFighter.weapons[weaponIdx];
+    if (!weapon || !weapon[cfg.field]) return;
+
+    let acc = weapon[cfg.field];
+    let origFighter = (appState.editTarget !== null && currentGang.members[appState.editTarget]) ? currentGang.members[appState.editTarget] : null;
+    let wasOnOrig = origFighter && (origFighter.weapons || []).some(ow => ow[cfg.field] && ow[cfg.field].name === acc.name);
+
+    if (acc.fromStash || (currentGang && currentGang.isEstablished && wasOnOrig && !acc.isDefault)) {
+        if (!currentGang.stash) currentGang.stash = [];
+        currentGang.stash.push({
+            name: acc.name,
+            type: cfg.label,
+            cost: acc.cost_credits || acc.cost || 0,
+            id: acc.id,
+            poisonGasCategory: category,
+            usedThisCycle: !!acc.usedThisCycle
+        });
+        saveGangs();
+    }
+
+    weapon[cfg.field] = null;
+    closeModal();
+    renderFighterEdit(document.getElementById('main-content'));
+}
+
+// ==========================================
 // SELECTION ET GESTION DES ARMURES & EQUIPEMENTS
 // ==========================================
 // Génère le HTML d'une catégorie d'équipement achetable (Armures, Équipement

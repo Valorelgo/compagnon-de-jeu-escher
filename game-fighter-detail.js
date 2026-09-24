@@ -64,6 +64,12 @@ function openFighterDetailModal(idx) {
             if (w.accessory && w.accessory.effect) {
                 traitDescriptionsHTML += `<div class="description-block trait-block"><strong>Accessoire — ${w.accessory.name} (${w.name}) :</strong> ${w.accessory.effect}</div>`;
             }
+            if (w.poisonAccessory && w.poisonAccessory.effect) {
+                traitDescriptionsHTML += `<div class="description-block trait-block" style="border-left-color:#e74c3c;"><strong>☠ Poison — ${w.poisonAccessory.name} (${w.name}) :</strong> ${w.poisonAccessory.effect}</div>`;
+            }
+            if (w.gasAccessory && w.gasAccessory.effect) {
+                traitDescriptionsHTML += `<div class="description-block trait-block" style="border-left-color:#27ae60;"><strong>☁ Munition gazeuse — ${w.gasAccessory.name} (${w.name}) :</strong> ${w.gasAccessory.effect}</div>`;
+            }
             
             // Toutes les armes à profils multiples (fusil à pompe, lance-grenades...)
             // peuvent avoir des traits différents par profil (ex: Knockback
@@ -107,11 +113,29 @@ function openFighterDetailModal(idx) {
 
     // 3. ÉQUIPEMENTS & ARMURES (COLONNE GAUCHE)
     let equipmentDetailsHTML = '';
-    let nonGrenadeEquip = (m.equipment || []).filter(e => !(e.counts_as_equip || e.type === 'Grenade' || (e.id && ((e.id.startsWith('wpn_grenade_') && e.id !== 'wpn_grenade_launcher') || e.id === 'wpn_charge_demo'))));
+    let nonGrenadeEquip = (m.equipment || []).filter(e => !(e.counts_as_equip || e.type === 'Grenade' || (e.id && ((e.id.startsWith('wpn_grenade_') && e.id !== 'wpn_grenade_launcher') || e.id === 'wpn_charge_demo')) || e.type === 'Stimm'));
     let grenadeEquip = (m.equipment || []).filter(e => e.counts_as_equip || e.type === 'Grenade' || (e.id && ((e.id.startsWith('wpn_grenade_') && e.id !== 'wpn_grenade_launcher') || e.id === 'wpn_charge_demo')));
+    let stimmEquip = [];
+    (m.equipment || []).forEach((e, eIdx) => { if (e && e.type === 'Stimm') stimmEquip.push({ item: e, eIdx }); });
+
+    if (stimmEquip.length > 0) {
+        equipmentDetailsHTML += `
+            <div style="margin-top:12px;">
+                <h4 style="color:#e91e63; font-size:13px; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:6px;">💉 Stimms</h4>
+                ${stimmEquip.map(({ item: s, eIdx }) => `
+                    <div class="description-block" style="border-left-color:#e91e63; display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap; ${s.usedThisCycle ? 'opacity:0.45;' : ''}">
+                        <span><strong>${s.name}</strong> : ${s.effect || 'Stimm.'}</span>
+                        <button class="${s.usedThisCycle ? 'btn' : 'btn-cyan'}" style="padding:3px 10px; font-size:11px; margin:0; flex-shrink:0;" ${s.usedThisCycle ? 'disabled title="Déjà utilisé ce cycle"' : ''} onclick="useStimmInGame(${idx}, ${eIdx})">
+                            ${s.usedThisCycle ? '✓ Utilisé ce cycle' : 'Utiliser'}
+                        </button>
+                    </div>
+                `).join('')}
+            </div>
+        `;
+    }
 
     if (m.equipment && m.equipment.length > 0) {
-        equipmentDetailsHTML = `
+        equipmentDetailsHTML += `
             <div style="margin-top:12px;">
                 <h4 style="color:var(--accent-purple); font-size:13px; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:6px;">Armures & Équipements</h4>
                 ${nonGrenadeEquip.map(e => `
@@ -412,6 +436,32 @@ function updateFighterStatus(idx, val) {
             triggerOutOfActionAlert(currentGameRoster[idx], isModalOpen ? idx : null);
         }
     }
+}
+
+// Marque un stimm comme utilisé pour ce cycle (bouton sur la fiche de
+// combattant en jeu). Verrouillé jusqu'à la validation du prochain cycle
+// (voir confirmNewCycle dans postbattle-sequence.js qui réinitialise ce flag).
+// currentGameRoster est une copie indépendante de la fiche du gang : il faut
+// donc répercuter le changement sur le combattant réel (même index dans son
+// tableau equipment) pour que le verrouillage persiste au-delà de la partie.
+function useStimmInGame(idx, eIdx) {
+    let m = currentGameRoster[idx];
+    if (!m || !m.equipment || !m.equipment[eIdx]) return;
+    let item = m.equipment[eIdx];
+    if (item.usedThisCycle) return;
+
+    item.usedThisCycle = true;
+
+    if (typeof currentGang !== 'undefined' && currentGang && currentGang.members) {
+        let gangFighter = currentGang.members.find(gm => gm.id === m.id);
+        if (gangFighter && gangFighter.equipment && gangFighter.equipment[eIdx]) {
+            gangFighter.equipment[eIdx].usedThisCycle = true;
+            if (typeof saveGangs === 'function') saveGangs();
+        }
+    }
+
+    if (typeof showToast === 'function') showToast(`${item.name} utilisé !`, "success");
+    openFighterDetailModal(idx);
 }
 
 // Un guerrier Sérieusement blessé peut tenter de quitter le combat avant la

@@ -300,6 +300,24 @@ function transferFighterGearToStash(m) {
                 let accCost = w.accessory.cost_credits || w.accessory.cost || 0;
                 currentGang.stash.push({ name: w.accessory.name, type: "Accessoire", cost: accCost });
             }
+            // Poisons et munitions gazeuses (accessoires Escher) : même logique
+            // que l'accessoire normal ci-dessus, en conservant usedThisCycle
+            // pour ne pas permettre de "réinitialiser" leur usage via un aller-
+            // retour par le stash (voir removePoisonGas).
+            if (w.poisonAccessory) {
+                currentGang.stash.push({
+                    name: w.poisonAccessory.name, type: "Poison",
+                    cost: w.poisonAccessory.cost_credits || 0, id: w.poisonAccessory.id,
+                    poisonGasCategory: 'poison', usedThisCycle: !!w.poisonAccessory.usedThisCycle
+                });
+            }
+            if (w.gasAccessory) {
+                currentGang.stash.push({
+                    name: w.gasAccessory.name, type: "Munition gazeuse",
+                    cost: w.gasAccessory.cost_credits || 0, id: w.gasAccessory.id,
+                    poisonGasCategory: 'gas', usedThisCycle: !!w.gasAccessory.usedThisCycle
+                });
+            }
         });
     }
     if (m.armor) {
@@ -711,6 +729,16 @@ function confirmNewCycle() {
                     m.recovery = false;
                     m.ooa = false;
                     resolveEndedRecoveryInjuries(m);
+
+                    // Un nouveau cycle débloque tous les usages "une fois par
+                    // cycle" : stimms, poisons et munitions gazeuses (Escher).
+                    (m.equipment || []).forEach(e => {
+                        if (e && e.type === 'Stimm') e.usedThisCycle = false;
+                    });
+                    (m.weapons || []).forEach(w => {
+                        if (w && w.poisonAccessory) w.poisonAccessory.usedThisCycle = false;
+                        if (w && w.gasAccessory) w.gasAccessory.usedThisCycle = false;
+                    });
                 });
                 safeSave();
             }

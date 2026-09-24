@@ -687,6 +687,44 @@ function isAccessoryCompatibleWithWeapon(accId, weapon) {
     return true;
 }
 
+// ==========================================
+// POISONS & MUNITIONS GAZEUSES (accessoires d'arme Escher)
+// ==========================================
+// Profils actuellement "actifs" d'une arme : son ou ses profils de base, plus
+// tout profil optionnel déjà débloqué (ex: flèches empoisonnées du Wyld bow).
+// C'est sur cet ensemble qu'on vérifie la présence d'un trait donné, pour que
+// les armes à profils multiples comptent bien si UN SEUL de leurs profils a
+// le trait recherché (toxine, gaz, gabarit...).
+function getWeaponAllActiveProfiles(w) {
+    if (!w) return [];
+    let profiles = (w.profiles || []).slice();
+    if (w.optional_profiles && w.unlockedOptions && w.unlockedOptions.length > 0) {
+        profiles = profiles.concat(w.optional_profiles.filter(op => w.unlockedOptions.includes(op.name)));
+    }
+    return profiles;
+}
+
+function weaponHasTraitAcrossProfiles(w, traitSubstring) {
+    return getWeaponAllActiveProfiles(w).some(p => (p.traits || '').toLowerCase().includes(traitSubstring));
+}
+
+// Un poison n'est achetable/équipable que sur une arme ayant le trait toxine
+// (X+), sur au moins un de ses profils actifs (y compris une option débloquée).
+function isPoisonCompatibleWithWeapon(weapon) {
+    return weaponHasTraitAcrossProfiles(weapon, 'toxine');
+}
+
+// Une munition gazeuse n'est achetable/équipable que sur une arme ayant le
+// trait gaz ; Lifting exige en plus le trait gabarit sur l'arme.
+function isGasMunitionCompatibleWithWeapon(accId, weapon) {
+    if (!weaponHasTraitAcrossProfiles(weapon, 'gaz')) return false;
+    if (typeof db !== 'undefined' && db.weapon_gas_munitions) {
+        let def = db.weapon_gas_munitions.find(g => g.id === accId);
+        if (def && def.requiresAlsoTrait && !weaponHasTraitAcrossProfiles(weapon, def.requiresAlsoTrait)) return false;
+    }
+    return true;
+}
+
 function getArmorStatDeltas(m) {
     if (!m || !m.equipment || !Array.isArray(m.equipment)) return null;
     let hasHeavy = m.equipment.some(e => e && (e.id === 'eq_armure_cara_lourde' || e.name === 'Armure carapace lourde'));
@@ -752,6 +790,15 @@ function calculateFighterCost(m) {
         }
         if (w.accessory && typeof w.accessory === 'object' && !w.accessory.isDefault) {
             total += (w.accessory.cost_credits || w.accessory.cost || 0);
+        }
+        // Poisons et munitions gazeuses (accessoires Escher) : distincts de
+        // w.accessory (ne comptent pas dans la limite d'1 accessoire par arme),
+        // mais leur coût s'ajoute bien au total comme n'importe quel accessoire.
+        if (w.poisonAccessory && typeof w.poisonAccessory === 'object' && !w.poisonAccessory.isDefault) {
+            total += (w.poisonAccessory.cost_credits || w.poisonAccessory.cost || 0);
+        }
+        if (w.gasAccessory && typeof w.gasAccessory === 'object' && !w.gasAccessory.isDefault) {
+            total += (w.gasAccessory.cost_credits || w.gasAccessory.cost || 0);
         }
         // Options payantes débloquées sur cette arme (ex: Photon flash/Fumigène
         // du Grenade launcher) : chacune augmente la valeur du combattant de

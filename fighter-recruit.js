@@ -461,13 +461,29 @@ function renderFighterEdit(container) {
                         }
                     }
 
+                    let canEditGear = !isBeast && (!isMerc || isHiveScum);
+                    let poisonHTML = '';
+                    if (typeof isPoisonCompatibleWithWeapon === 'function' && isPoisonCompatibleWithWeapon(w)) {
+                        poisonHTML = w.poisonAccessory
+                            ? `<br><small style="color:#e74c3c; margin-left:12px;">☠ Poison : ${w.poisonAccessory.name} — <em>${w.poisonAccessory.effect || ''}</em> ${w.poisonAccessory.usedThisCycle ? '<span style="color:#888;">(déjà activé ce cycle)</span>' : ''} (${w.poisonAccessory.cost_credits||0}c) ${canEditGear ? `<button class="btn-danger" style="padding:2px 6px; font-size:10px; margin-left:5px;" onclick="removePoisonGas(${i}, 'poison')">Retirer</button>` : ''}</small>`
+                            : (canEditGear ? `<br><button style="padding:2px 6px; font-size:11px; margin-left:12px; margin-top:4px;" onclick="openPoisonGasModal(${i}, 'poison')">+ Ajouter un poison</button>` : '');
+                    }
+                    let gasHTML = '';
+                    if (typeof weaponHasTraitAcrossProfiles === 'function' && weaponHasTraitAcrossProfiles(w, 'gaz')) {
+                        gasHTML = w.gasAccessory
+                            ? `<br><small style="color:#27ae60; margin-left:12px;">☁ Munition gazeuse : ${w.gasAccessory.name} — <em>${w.gasAccessory.effect || ''}</em> ${w.gasAccessory.usedThisCycle ? '<span style="color:#888;">(déjà activée ce cycle)</span>' : ''} (${w.gasAccessory.cost_credits||0}c) ${canEditGear ? `<button class="btn-danger" style="padding:2px 6px; font-size:10px; margin-left:5px;" onclick="removePoisonGas(${i}, 'gas')">Retirer</button>` : ''}</small>`
+                            : (canEditGear ? `<br><button style="padding:2px 6px; font-size:11px; margin-left:12px; margin-top:4px;" onclick="openPoisonGasModal(${i}, 'gas')">+ Ajouter une munition gazeuse</button>` : '');
+                    }
+
                     return `
                     <div style="margin:8px 0; background:#181818; padding:8px; border-radius:4px; display:flex; justify-content:space-between; align-items:flex-start;">
                         <div>
                             • <strong>${w.name}</strong> (${w.cost_credits||0}c) ${isTwoSlots ? `<span style="color:var(--accent-purple); font-size:11px; margin-left:6px;">(${slotCost === 1 ? '1 emp. grâce aux Suspensors' : '2 emplacements'})</span>` : ''}
                             ${statsText ? `<br><small style="color:#aaa; font-size:11px; margin-left:12px;">${statsText}</small>` : ''}
                             ${lockedOptionsHTML}
-                            ${w.accessory ? `<br><small style="color:var(--accent-cyan); margin-left:12px;">↳ Accessoire (1 max) : ${w.accessory.name} ${w.accessory.effect ? `— <em>${w.accessory.effect}</em>` : ''} ${w.accessory.fromStash ? '<span style="color:#2ecc71;">(Réserve - 0c)</span>' : `(${w.accessory.cost_credits||0}c)`} ${!isBeast && (!isMerc || isHiveScum) ? `<button class="btn-danger" style="padding:2px 6px; font-size:10px; margin-left:5px;" onclick="removeWeaponAccessory(${i})">Retirer accessoire</button>` : ''}</small>` : (!isBeast && (!isMerc || isHiveScum) ? `<br><button style="padding:2px 6px; font-size:11px; margin-left:12px; margin-top:4px;" onclick="openWeaponAccessoryModal(${i})">+ Ajouter un accessoire (1 max)</button>` : '')}
+                            ${w.accessory ? `<br><small style="color:var(--accent-cyan); margin-left:12px;">↳ Accessoire (1 max) : ${w.accessory.name} ${w.accessory.effect ? `— <em>${w.accessory.effect}</em>` : ''} ${w.accessory.fromStash ? '<span style="color:#2ecc71;">(Réserve - 0c)</span>' : `(${w.accessory.cost_credits||0}c)`} ${canEditGear ? `<button class="btn-danger" style="padding:2px 6px; font-size:10px; margin-left:5px;" onclick="removeWeaponAccessory(${i})">Retirer accessoire</button>` : ''}</small>` : (canEditGear ? `<br><button style="padding:2px 6px; font-size:11px; margin-left:12px; margin-top:4px;" onclick="openWeaponAccessoryModal(${i})">+ Ajouter un accessoire (1 max)</button>` : '')}
+                            ${poisonHTML}
+                            ${gasHTML}
                         </div>
                         ${w.isInnateWeapon
                             ? `<span style="background:rgba(0,255,255,0.15); border:1px solid var(--accent-cyan); color:var(--accent-cyan); font-size:10px; font-weight:bold; padding:3px 10px; border-radius:10px; flex-shrink:0; white-space:nowrap;" title="Arme accordée automatiquement par une compétence : ne peut pas être retirée.">✦ Innée</span>`

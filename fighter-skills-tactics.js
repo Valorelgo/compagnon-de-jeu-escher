@@ -163,6 +163,8 @@ function saveFighter() {
             (tempFighter.weapons || []).forEach(w => {
                 if (!w.fromStash && !w.isDefault) creditsToPay += (w.cost_credits || 0);
                 if (w.accessory && !w.accessory.fromStash && !w.accessory.isDefault) creditsToPay += (w.accessory.cost_credits || 0);
+                if (w.poisonAccessory && !w.poisonAccessory.fromStash && !w.poisonAccessory.isDefault) creditsToPay += (w.poisonAccessory.cost_credits || 0);
+                if (w.gasAccessory && !w.gasAccessory.fromStash && !w.gasAccessory.isDefault) creditsToPay += (w.gasAccessory.cost_credits || 0);
             });
             (tempFighter.equipment || []).forEach(e => {
                 if (!e.fromStash && !e.isDefault && !e.costPrepaid) creditsToPay += (e.cost_credits || 0);
@@ -170,10 +172,10 @@ function saveFighter() {
         } else {
             let origFighter = currentGang.members[appState.editTarget];
             
-            const countNewItems = (tempList, origList, getItemName, getAcc) => {
+            const countNewItems = (tempList, origList, getItemName, accField) => {
                 let tempCounts = {};
                 (tempList || []).forEach(item => {
-                    if (getAcc) item = item.accessory;
+                    if (accField) item = item[accField];
                     if (!item) return;
                     if (!item.fromStash && !item.isDefault && !item.costPrepaid) {
                         let n = getItemName(item);
@@ -185,7 +187,7 @@ function saveFighter() {
 
                 let origCounts = {};
                 (origList || []).forEach(item => {
-                    if (getAcc) item = item.accessory;
+                    if (accField) item = item[accField];
                     if (!item) return;
                     if (!item.fromStash && !item.isDefault && !item.costPrepaid) {
                         let n = getItemName(item);
@@ -205,7 +207,9 @@ function saveFighter() {
             };
 
             creditsToPay += countNewItems(tempFighter.weapons, origFighter.weapons, w => w.name, false);
-            creditsToPay += countNewItems(tempFighter.weapons, origFighter.weapons, acc => acc.name, true);
+            creditsToPay += countNewItems(tempFighter.weapons, origFighter.weapons, acc => acc.name, 'accessory');
+            creditsToPay += countNewItems(tempFighter.weapons, origFighter.weapons, acc => acc.name, 'poisonAccessory');
+            creditsToPay += countNewItems(tempFighter.weapons, origFighter.weapons, acc => acc.name, 'gasAccessory');
             creditsToPay += countNewItems(tempFighter.equipment, origFighter.equipment, e => e.name, false);
         }
 

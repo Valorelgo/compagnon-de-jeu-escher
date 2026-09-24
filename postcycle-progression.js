@@ -93,7 +93,7 @@ function openStashModal() {
             let Y = X + stashCount;
             let sellPrice = calculateResellPrice(data.cost);
             let cleanName = escapeForJsStr(itemName);
-            let isAccessory = (data.type || '').toLowerCase().includes('accessoire');
+            let isAccessory = (data.type || '').toLowerCase().includes('accessoire') || data.type === 'Poison' || data.type === 'Munition gazeuse';
             let isFamiliarRow = data.type === 'Familier';
             let canQuickEquip = stashCount > 0 && !isAccessory && !isFamiliarRow;
             let canQuickAdoptFamiliar = stashCount > 0 && isFamiliarRow;

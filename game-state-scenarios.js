@@ -592,6 +592,10 @@ let setupState = {
     // utilisent le même nombre (convenu au préalable, ex: en lançant un vrai
     // dé D3 physique une seule fois pour la table).
     diceCount: null,
+    // Activations de poisons/munitions gazeuses choisies pour LA PARTIE en
+    // cours (voir renderPoisonGasActivationView / confirmPoisonGasActivation).
+    poisonGasActivations: {},
+    confirmedPoisonGasActivations: [],
     initialPickedIds: [],
     randomDrawnIds: [],
     reinforcementPickedIds: [],
@@ -613,6 +617,8 @@ function resetSetupState() {
         step: 1,
         territoryEffectId: null,
         diceCount: null,
+        poisonGasActivations: {},
+        confirmedPoisonGasActivations: [],
         initialPickedIds: [],
         randomDrawnIds: [],
         reinforcementPickedIds: [],
@@ -895,6 +901,8 @@ function renderGameSetup(container) {
 
     if (setupState.step === 1) {
         html += renderStep1View(availableMembers);
+    } else if (setupState.step === 2) {
+        html += renderPoisonGasActivationView();
     } else {
         html += renderStep2View(availableMembers);
     }
@@ -1183,6 +1191,127 @@ function validateStep1() {
     renderGameSetup(document.getElementById('main-content'));
 }
 
+// Combattants qui participeront effectivement à cette partie (choisis,
+// tirés au hasard, et renforts) : c'est parmi leurs armes qu'on cherche les
+// poisons/munitions gazeuses à activer, avant de lancer la partie.
+function getBattleParticipantMembers() {
+    if (!currentGang || !currentGang.members) return [];
+    let ids = []
+        .concat(setupState.initialPickedIds || [])
+        .concat(setupState.randomDrawnIds || [])
+        .concat(setupState.reinforcementPickedIds || []);
+    let uniqueIds = [...new Set(ids)];
+    return uniqueIds.map(id => currentGang.members.find(m => m.id === id)).filter(Boolean);
+}
+
+// Étape 2 de la mise en place de partie : juste après avoir choisi les
+// guerriers, on demande quels poisons/munitions gazeuses (déjà achetés,
+// attachés à une arme précise) sont activés pour CETTE partie. Une fois
+// activé, l'accessoire est verrouillé jusqu'à la validation du prochain
+// cycle (voir confirmNewCycle dans postbattle-sequence.js).
+function renderPoisonGasActivationView() {
+    let participants = getBattleParticipantMembers();
+    let rows = [];
+    participants.forEach(m => {
+        (m.weapons || []).forEach((w, wIdx) => {
+            ['poisonAccessory', 'gasAccessory'].forEach(field => {
+                if (w && w[field]) {
+                    rows.push({
+                        key: `${m.id}_${wIdx}_${field}`,
+                        fighterId: m.id,
+                        fighterName: m.customName || m.charName,
+                        weaponName: w.name,
+                        field: field,
+                        acc: w[field]
+                    });
+                }
+            });
+        });
+    });
+
+    if (!setupState.poisonGasActivations) setupState.poisonGasActivations = {};
+
+    let html = `
+        <h3>☠️ Activation des Poisons & Munitions Gazeuses</h3>
+        <p style="font-size:13px; color:#ccc; margin-bottom:14px;">
+            Juste après avoir choisi vos guerriers : activez les poisons/munitions gazeuses que vous voulez charger pour <strong>cette partie précise</strong>.
+            Chaque activation verrouille l'accessoire concerné jusqu'à la validation du prochain cycle.
+        </p>
+    `;
+
+    if (rows.length === 0) {
+        html += `<p style="color:#888; margin-bottom:15px;">Aucun guerrier sélectionné n'a de poison ou de munition gazeuse équipé.</p>`;
+    } else {
+        html += `<div style="display:flex; flex-direction:column; gap:8px; margin-bottom:15px;">`;
+        rows.forEach(r => {
+            let locked = !!r.acc.usedThisCycle;
+            let checked = !!setupState.poisonGasActivations[r.key];
+            html += `
+                <div style="background:#161922; border:1px solid #2d3345; border-radius:6px; padding:10px 12px; ${locked ? 'opacity:0.5;' : ''}">
+                    <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
+                        <div>
+                            <strong style="color:#fff;">${r.fighterName}</strong> — <span style="color:var(--accent-cyan);">${r.weaponName}</span><br>
+                            <small style="color:#aaa;">${r.field === 'poisonAccessory' ? '☠' : '☁'} <strong>${r.acc.name}</strong> : ${r.acc.effect || ''}</small>
+                        </div>
+                        <label style="display:flex; align-items:center; gap:6px; cursor:${locked ? 'not-allowed' : 'pointer'}; flex-shrink:0;">
+                            ${locked
+                                ? `<span style="font-size:11px; color:#888; white-space:nowrap;">Déjà utilisé ce cycle</span>`
+                                : `<input type="checkbox" ${checked ? 'checked' : ''} onchange="togglePoisonGasActivation('${r.key}', this.checked)">
+                                   <span style="font-size:12px; white-space:nowrap;">Activer pour cette partie</span>`
+                            }
+                        </label>
+                    </div>
+                </div>
+            `;
+        });
+        html += `</div>`;
+    }
+
+    html += `
+        <div style="display:flex; gap:10px;">
+            <button class="btn" onclick="setupState.step = 1; renderGameSetup(document.getElementById('main-content'));">← Modifier étape 1</button>
+            <button class="btn btn-cyan" style="flex:1;" onclick="confirmPoisonGasActivation()">Continuer →</button>
+        </div>
+    `;
+    return html;
+}
+
+function togglePoisonGasActivation(key, checked) {
+    if (!setupState.poisonGasActivations) setupState.poisonGasActivations = {};
+    setupState.poisonGasActivations[key] = checked;
+}
+
+// Verrouille (usedThisCycle = true, persistant sur la fiche du gang) chaque
+// poison/munition gazeuse coché(e), puis mémorise la liste pour que
+// startGame() applique l'effet correspondant sur la copie de combat de
+// l'arme (voir plus bas).
+function confirmPoisonGasActivation() {
+    setupState.confirmedPoisonGasActivations = [];
+    let activations = setupState.poisonGasActivations || {};
+
+    Object.keys(activations).forEach(key => {
+        if (!activations[key]) return;
+        let parts = key.split('_');
+        let field = parts.pop();
+        let weaponIdx = parseInt(parts.pop(), 10);
+        let fighterId = parts.join('_');
+
+        let m = currentGang.members.find(x => x.id === fighterId);
+        if (!m || !m.weapons || !m.weapons[weaponIdx] || !m.weapons[weaponIdx][field]) return;
+        if (m.weapons[weaponIdx][field].usedThisCycle) return;
+
+        m.weapons[weaponIdx][field].usedThisCycle = true;
+        setupState.confirmedPoisonGasActivations.push({ fighterId, weaponIdx, field });
+    });
+
+    if (setupState.confirmedPoisonGasActivations.length > 0 && typeof saveGangs === 'function') {
+        saveGangs();
+    }
+
+    setupState.step = 3;
+    renderGameSetup(document.getElementById('main-content'));
+}
+
 function startGame() {
     let isQuick = typeof appState !== 'undefined' && appState.isQuickMatch;
 
@@ -1222,6 +1351,30 @@ function startGame() {
     setupState.randomDrawnIds.forEach(id => addFighterWithFamiliars(id, false));
 
     setupState.reinforcementPickedIds.forEach(id => addFighterWithFamiliars(id, true));
+
+    // Applique les poisons/munitions gazeuses activés pour CETTE partie (voir
+    // confirmPoisonGasActivation) : ajoute le trait accordé (rad-phage,
+    // flammes (5+)...) au(x) profil(s) concerné(s) de la copie de combat de
+    // l'arme. Ne modifie jamais la fiche permanente du gang (currentGameRoster
+    // est un clone indépendant, voir addFighterToGameRoster).
+    (setupState.confirmedPoisonGasActivations || []).forEach(act => {
+        let fighter = currentGameRoster.find(x => x.id === act.fighterId);
+        if (!fighter || !fighter.weapons || !fighter.weapons[act.weaponIdx]) return;
+        let weapon = fighter.weapons[act.weaponIdx];
+        let acc = weapon[act.field];
+        if (!acc || !acc.grantsTrait) return;
+
+        let requiredBaseTrait = (act.field === 'poisonAccessory') ? 'toxine' : 'gaz';
+        let profiles = (weapon.profiles || []).concat(
+            (weapon.optional_profiles && weapon.unlockedOptions) ? weapon.optional_profiles.filter(op => weapon.unlockedOptions.includes(op.name)) : []
+        );
+        profiles.forEach(p => {
+            let traitsLower = (p.traits || '').toLowerCase();
+            if (traitsLower.includes(requiredBaseTrait) && !traitsLower.includes(acc.grantsTrait.toLowerCase())) {
+                p.traits = (p.traits ? p.traits + ', ' : '') + acc.grantsTrait;
+            }
+        });
+    });
 
     let allPool = getAllTacticsPool();
     gameTactics = (setupState.selectedTacticsIds || []).map(id => {

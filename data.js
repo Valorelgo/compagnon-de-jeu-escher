@@ -454,6 +454,34 @@ const db = {
         desc: "Chaque stimm ne peut être utilisé qu'une seule fois par cycle de campagne. Un guerrier peut posséder plusieurs exemplaires du même stimm (achetés séparément)."
     },
 
+    // ===== POISONS (accessoires d'arme Escher) =====
+    // Applicables UNIQUEMENT aux armes ayant le trait toxine (X+), y compris via
+    // un profil optionnel débloqué (ex: flèches empoisonnées du Wyld bow).
+    // Ne comptent PAS dans la limite d'1 accessoire par arme (accessory_rules
+    // ci-dessus) : une arme peut avoir 1 accessoire normal + 1 poison. Une même
+    // arme ne peut avoir qu'1 seul poison actif à la fois, mais rien n'empêche
+    // d'en acheter/équiper sur plusieurs armes différentes du gang.
+    // grantsTrait : trait ajouté au profil de l'arme concernée une fois le
+    // poison ACTIVÉ pour une partie (voir activatePoisonForBattle côté moteur).
+    // usedThisCycle : verrouillé après activation pour une partie, jusqu'à la
+    // validation du prochain cycle (confirmNewCycle réinitialise ce flag).
+    weapon_poisons: [
+        { id: "acc_poison_exploding", name: "Exploding", cost_credits: 20, effect: "Quand un ennemi est mis hors de combat par ce poison, placez le gabarit de 3\" : toute figurine sous le gabarit subit une touche L1 avec les traits toxine (3+) et gaz." },
+        { id: "acc_poison_irradiating", name: "Irradiating", cost_credits: 20, effect: "L'arme gagne le trait Rad-phage.", grantsTrait: "rad-phage" },
+        { id: "acc_poison_paralysing", name: "Paralysing", cost_credits: 15, effect: "Un ennemi blessé par cette arme doit réussir un test d'Endurance sous peine de subir la condition Webbed." }
+    ],
+
+    // ===== MUNITIONS GAZEUSES (accessoires d'arme Escher) =====
+    // Applicables UNIQUEMENT aux armes ayant le trait gaz (mêmes règles de
+    // cumul/activation que les poisons ci-dessus).
+    // requiresAlsoTrait : trait supplémentaire exigé sur l'arme en plus de gaz
+    // (Lifting n'est utilisable que sur une arme ayant aussi le trait gabarit).
+    weapon_gas_munitions: [
+        { id: "acc_gas_hallucinogene", name: "Hallucinogène", cost_credits: 20, effect: "Un ennemi blessé par cette arme doit réussir un test de Volonté sous peine de subir la condition Folie." },
+        { id: "acc_gas_lifting", name: "Lifting", cost_credits: 25, effect: "Le gabarit peut être placé à 6\" du tireur, la pointe dirigée vers lui.", requiresAlsoTrait: "gabarit" },
+        { id: "acc_gas_pyrophoric", name: "Pyrophoric", cost_credits: 20, effect: "L'arme gagne le trait Flammes (5+).", grantsTrait: "flammes (5+)" }
+    ],
+
     // ===== RÈGLES DES ACCESSOIRES =====
     accessory_rules: {
         max_per_weapon: 1,
